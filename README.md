@@ -6,7 +6,9 @@ Group 5 · Section C2B — Cullarin, Mendoza, Peco, Titong
 
 ## 0. Skill-Level Rules (READ FIRST — these override any "better" way you know)
 
-The code must look like the team's earlier projects (Vehicle Rental, Inventory Manager, Library): beginner-friendly Java 1.x style — plain classes, `Scanner`, `static` helper methods in a helper class, `while` menu loops with `switch`, `try/catch` around parsing. Write the simplest code that works; prefer more lines over cleverness. Add a short comment above every method.
+The code must look like the team's earlier projects (Vehicle Rental, Inventory Manager, Library): beginner-friendly Java — plain classes, `Scanner`, `static` helper methods in a helper class, `while` menu loops with `switch`, `try/catch` around parsing. Write the simplest code that works; prefer more lines over cleverness. Comments are rare and one line, like the originals. See §0.5 for excerpts to copy.
+
+**Scope rule**: build only what the proposal and this guide state. Do not add features, fields, files, or validations that are not written here.
 
 | ✅ ALLOWED | ❌ FORBIDDEN |
 | --- | --- |
@@ -21,10 +23,173 @@ The code must look like the team's earlier projects (Vehicle Rental, Inventory M
 | `BufferedReader`+`FileReader`, `PrintWriter`+`FileWriter`, `java.io.File`, `IOException` |  |
 | `java.time`: **only** `LocalDate.now().toString()`, `LocalTime.now()` (`getHour()`, `getMinute()`), `LocalDateTime.now().toString()` |  |
 | `if/else`, `switch`/`case`/`break`, `for`, `while`, `do-while`, ternary `? :` |  |
-| `Object.hashCode()` on a `String` (for passwords — see §6) |  |
 | `double` for all money, rounded with `Math.round(x * 100) / 100.0`, printed with `%.2f` |  |
 
-**Technology**: Java + plain `.txt` files only. Terminal only (`System.in` / `System.out`). Run with the working directory = project root (so `"data/users.txt"` resolves).
+**Technology**: Java + plain `.txt` files only. Terminal only (`System.in` / `System.out`). The `.txt` files are created in the project's main folder the first time the program saves; run the program from `Main` in VS Code.
+
+## 0.5 Code Style Reference — copy this style
+
+These are short excerpts from Jacob's earlier projects (Vehicle Rental, Inventory Manager, Library). **The generated code must look like them**: same structure, same naming, same messages, same print format. Do not "upgrade" it.
+
+- One class per file, default package. `Main` has `static` objects and `static` helper methods.
+- Entity classes: `private` fields, a constructor, one-line getters, setters only where a value changes; abstract classes with `extends`, `super(...)`, `@Override`.
+- A manager class (`Inventory`, `Library`) owns the collection and has `add...`, `find...` (a `for` loop that returns the match or `null`), and `view...` (prints a table).
+- Menu loop: `boolean endProgram`, `while (!endProgram)`, menu text with `System.out.print("\n...")`, `getValidInt("--> Option: ")`, `switch` with a `default:` error line.
+- Validation: a `getValid...` helper with `boolean isValid`, `while (!isValid)`, `sc.nextLine()`, a blank check with `continue`, `try/catch (NumberFormatException e)`, simple `matches(regex)`; error lines start with `Error: `.
+- Plain names (`input`, `number`, `plate`, `option`), braces on every `if`, one statement per line, only occasional one-line `//` comments.
+- Money prints as `Php %.2f`; tables use `printf("%-15s | ...%n")` and `%-15.15s` to cut long text. Where this guide uses `ArrayList`, treat it like the `vehicles` array in `Inventory`: loop with `for`, write `find...` methods that return `null`, print tables with `printf`. The file read/write templates in §6 are the only new code style.
+
+```java
+// Entity classes (abstract parent + child)
+public abstract class Vehicle {
+    private String plateNumber;
+    private double baseRate;
+    private boolean isAvailable;
+
+    public Vehicle(String plateNumber, double baseRate) {
+        this.plateNumber = plateNumber;
+        this.baseRate = baseRate;
+        this.isAvailable = true;
+    }
+
+    public String getPlateNumber() { return plateNumber; }
+    public double getBaseRate() { return baseRate; }
+    public boolean isAvailable() { return isAvailable; }
+
+    public void setAvailable(boolean available) {
+        this.isAvailable = available;
+    }
+
+    public abstract double calculateCost(int days);
+}
+
+public class Van extends Vehicle {
+    private int cargoCapacity;
+
+    public Van(String plateNumber, double baseRate, int cargoCapacity) {
+        super(plateNumber, baseRate);
+        this.cargoCapacity = cargoCapacity;
+    }
+
+    @Override
+    public double calculateCost(int days) {
+        return (getBaseRate() * days) + 500;
+    }
+
+    public int getCargoCapacity() { return cargoCapacity; }
+}
+
+// Manager class: owns the array, add / find / view
+public class Inventory {
+    private Vehicle[] vehicles;
+
+    public Inventory() {
+        this.vehicles = new Vehicle[0];
+    }
+
+    public void addVehicle(Vehicle vehicle) {
+        vehicles = Arrays.copyOf(vehicles, vehicles.length + 1);
+        vehicles[vehicles.length - 1] = vehicle;
+    }
+
+    public Vehicle findVehicle(String plateNumber) {
+        for (Vehicle v : vehicles) {
+            if (v.getPlateNumber().equalsIgnoreCase(plateNumber)) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    public void viewAllVehicles() {
+        System.out.println("---------------------------------------------------------------------------");
+        System.out.printf("%-15s | %-15s | %-10.10s | %-10s%n", "Plate Number", "Model", "Type", "Status");
+        System.out.println("---------------------------------------------------------------------------");
+        for (Vehicle v : vehicles) {
+            String status = v.isAvailable() ? "Available" : "Rented";
+            String type = v.getClass().getSimpleName();
+            System.out.printf("%-15.15s | %-15.15s | %-10.10s | %-10.10s%n",
+                    v.getPlateNumber(), v.getModel(), type, status);
+        }
+    }
+}
+
+// Main: menu loop
+public class Main {
+    static Inventory inventory = new Inventory();
+    static Scanner sc = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        boolean endProgram = false;
+
+        while (!endProgram) {
+            System.out.print("\n=== VEHICLE RENTAL SYSTEM MENU ===");
+            System.out.print("\n1 - Add a vehicle\n2 - View all vehicles\n3 - Exit\n");
+            int option = getValidInt("--> Option: ");
+
+            switch (option) {
+                case 1:
+                    addVehicle();
+                    break;
+                case 2:
+                    inventory.viewAllVehicles();
+                    break;
+                case 3:
+                    endProgram = true;
+                    break;
+                default:
+                    System.out.println("Error: Invalid option. Please choose 1-3.");
+            }
+        }
+    }
+
+    // Validation helper
+    public static int getValidInt(String prompt) {
+        int number = -1;
+        boolean isValid = false;
+
+        while (!isValid) {
+            System.out.print(prompt);
+            String input = sc.nextLine();
+
+            if (input.trim().isEmpty()) {
+                System.out.println("Error: Input cannot be empty or just spaces.");
+                continue;
+            }
+
+            try {
+                number = Integer.parseInt(input.trim());
+                if (number < 1) {
+                    System.out.println("Error: No values less than 1.");
+                } else {
+                    isValid = true;
+                }
+            } catch (NumberFormatException e) {
+                System.out.println("Error: Please enter a valid number, not text.");
+            }
+        }
+        return number;
+    }
+
+    // Regex validation (same style for plates, names, emails, tracking numbers)
+    public static String getValidPlate(String prompt) {
+        String input = "";
+        boolean isValid = false;
+
+        while (!isValid) {
+            System.out.print(prompt);
+            input = sc.nextLine().trim();
+
+            if (input.matches("^[A-Z]{3}\\d{4}$")) {
+                isValid = true;
+            } else {
+                System.out.println("Error: Plates must be 3 UPPERCASE letters followed by 4 digits.");
+            }
+        }
+        return input;
+    }
+}
+```
 
 ## 1. Project Layout — One Folder per Team Member
 
@@ -37,7 +202,7 @@ CinemaBookingSystem/
     peco_users-menus/           Peco     — User classes + Main + InputHelper
     mendoza_strategy/           Mendoza  — Payment + Discount strategies
     cullarin_exceptions-logic/  Cullarin — exceptions + BookingManager + ReportManager
-  data/                         runtime .txt files (not committed)
+  (the .txt storage files appear in the project's main folder when the program runs; they are not committed)
 ```
 
 Full file lists, signatures, and commit steps are in §14.
@@ -57,16 +222,16 @@ Full file lists, signatures, and commit steps are in §14.
 
 All fields `private`; ints/doubles/Strings/booleans only (lists are `ArrayList<...>` inside `DataStore`).
 
-**Users** (`User` fields: `int id, String name, String email, String passwordHash`; methods: `abstract displayDashboard()`, getters)
+**Users** (`User` fields: `int id, String name, String email, String password, boolean active`; methods: `abstract displayDashboard()`, getters)
 
 | Class | Extra fields | Dashboard actions |
 | --- | --- | --- |
 | `Guest` | — | browse movies, view schedules/synopsis, search/filter, login, sign-up, exit |
-| `RegisteredUser` | `String birthdate, savedPaymentType, savedPaymentNumber` (one saved method; `"none"` if unset) | all Guest browsing, book, cancel, booking history, view ticket, edit profile, review movie, logout |
+| `RegisteredUser` | `String birthdate, savedPaymentType, savedPaymentNumber` (one saved method; `"none"` if unset) | all Guest browsing, book, cancel, booking history, view ticket, edit profile, review movie, deactivate my account, logout |
 | `Cashier` | — | search showtimes, counter booking, print receipt, logout |
 | `CustomerService` | — | view a user's bookings, process refund, create bulk request, logout |
 | `SnackManager` | — | add/edit/discontinue snack, update price, update stock, low-stock view, logout |
-| `Admin` | — | movies/schedules/halls CRUD, discounts/promos CRUD, review bulk requests, create staff accounts, revenue report, set system config, logout |
+| `Admin` | — | movies/schedules/halls CRUD, discounts/promos CRUD, review bulk requests, manage user accounts, revenue report, set system config, logout |
 
 **Model**
 
@@ -170,8 +335,7 @@ Every exception below `extends CbsException` and has only that one constructor. 
 | `ScheduleConflictException` | Admin schedule overlaps another in the same hall, or ends after 23:59 |
 | `InsufficientStockException` | snack quantity > stock |
 | `PaymentFailedException` | bad card/e-wallet number or amount ≤ 0 |
-| `InvalidDiscountException` | promo unknown/expired/inactive, ID invalid, Senior under 60, or stacking rule broken |
-| `ReviewNotEligibleException` | review before the showtime passed, not a CONFIRMED booking, or movie not watched |
+| `InvalidDiscountException` | promo unknown/expired/inactive, ID not confirmed, Senior under 60, or stacking rule broken |
 
 **Validation uses try/catch, like your past projects** (parse inside `try`, throw our exception for rule failures, catch both, reprompt):
 
@@ -208,7 +372,7 @@ Business flows (booking, cancel, etc.) wrap the steps in `try { ... } catch (Cbs
 
 ```java
 try {
-    BufferedReader br = new BufferedReader(new FileReader("data/movies.txt"));
+    BufferedReader br = new BufferedReader(new FileReader("movies.txt"));
     String line = br.readLine();
     while (line != null) {
         String[] p = line.split(";");
@@ -225,7 +389,7 @@ try {
 
 ```java
 try {
-    PrintWriter pw = new PrintWriter(new FileWriter("data/movies.txt"));
+    PrintWriter pw = new PrintWriter(new FileWriter("movies.txt"));
     for (Movie m : movies) {
         pw.println(m.toFileLine());
     }
@@ -239,7 +403,7 @@ try {
 
 | File | Fields (in order) |
 | --- | --- |
-| `users.txt` | id;role;name;email;passwordHash;birthdate;savedPaymentType;savedPaymentNumber — role = `REGISTERED_USER`/`CASHIER`/`CUSTOMER_SERVICE`/`SNACK_MANAGER`/`ADMIN`; staff use `none` for birthdate/payment. On load, build the matching subclass into one `ArrayList<User>` |
+| `users.txt` | id;role;name;email;password;active;birthdate;savedPaymentType;savedPaymentNumber — role = `REGISTERED_USER`/`CASHIER`/`CUSTOMER_SERVICE`/`SNACK_MANAGER`/`ADMIN`; staff use `none` for birthdate/payment. On load, build the matching subclass into one `ArrayList<User>` |
 | `movies.txt` | id;title;genre;language;ageRating;synopsis;durationMinutes |
 | `halls.txt` | id;cinemaLocation;hallName;rows;columns |
 | `schedules.txt` | id;movieId;hallId;date;startTime;format;ticketPrice |
@@ -254,15 +418,15 @@ try {
 | `counter_bookings.txt` | Booking format below — walk-in (`GUEST`) and approved bulk (`BULK`) bookings |
 | `bookings_<userId>.txt` | Booking format below — created empty at sign-up; one file per registered user (their booking history/tickets) |
 
-Booking line: `id;ownerType;ownerId;customerName;scheduleId;seats;status;totalPaid;timestamp`. Both booking file types share it, so one `loadBookings(path)` / `saveBookings(path, list)` pair serves all (path = `"data/bookings_" + userId + ".txt"` or `"data/counter_bookings.txt"`).
+Booking line: `id;ownerType;ownerId;customerName;scheduleId;seats;status;totalPaid;timestamp`. Both booking file types share it, so one `loadBookings(path)` / `saveBookings(path, list)` pair serves all (path = `"bookings_" + userId + ".txt"` or `"counter_bookings.txt"`).
 
 `seat_ledger.txt` is checked on every seat choice, whichever file the booking lands in — this prevents double-booking across online, counter and bulk.
 
 **IDs**: one global counter `NEXT_ID` in `system_config.txt`. `DataStore.generateId()` returns it, adds 1, saves. Display references as `"BK-" + String.format("%06d", id)`.
 
-**First run**: if a file is missing, `DataStore` creates it with defaults — `users.txt` gets one admin (`admin@cinema.com`, password `Admin123`, role `ADMIN`); `system_config.txt` gets §7 defaults.
+**First run**: if a file is missing, `DataStore` creates it with defaults — `users.txt` gets one account per staff role — `admin@cinema.com` / `Admin123` (ADMIN), `cashier@cinema.com` / `Cashier123` (CASHIER), `service@cinema.com` / `Service123` (CUSTOMER_SERVICE), `snacks@cinema.com` / `Snacks123` (SNACK_MANAGER); `system_config.txt` gets §7 defaults.
 
-**Passwords**: store `String.valueOf(password.hashCode())`, never the plain password. (Simplified protection suited to coursework — not real security; mention this limitation in the documentation.)
+**Passwords**: stored as plain text in `users.txt` (project decision).
 
 ## 7. System Configuration (`system_config.txt`)
 
@@ -287,9 +451,9 @@ Booking line: `id;ownerType;ownerId;customerName;scheduleId;seats;status;totalPa
 
 | Class | Rate | Rule |
 | --- | --- | --- |
-| `SeniorDiscount` | 20% off VAT-exclusive price + VAT exempt (RA 9994) | `(subtotal / 1.12) * 0.80`; user must be age ≥ 60; valid ID (6–12 digits) |
-| `PWDDiscount` | same as Senior (RA 10754) | `(subtotal / 1.12) * 0.80`; valid ID (6–12 digits) |
-| `StudentDiscount` | 10% off | `subtotal * 0.90`; valid school ID (6–12 digits) |
+| `SeniorDiscount` | 20% off VAT-exclusive price + VAT exempt (RA 9994) | `(subtotal / 1.12) * 0.80`; user must be age ≥ 60; user confirms a valid ID (`Y/N`) |
+| `PWDDiscount` | same as Senior (RA 10754) | `(subtotal / 1.12) * 0.80`; user confirms a valid ID (`Y/N`) |
+| `StudentDiscount` | 10% off | `subtotal * 0.90`; user confirms a valid school ID (`Y/N`) |
 | `PromoDiscount(type, value)` | Admin-defined | `PERCENT`: `subtotal * (1 − value/100)`; `FIXED`: `subtotal − value`; result floor 0 |
 | `BulkDiscount(seatCount)` | 10% for 20–49 seats, 15% for 50+ | `subtotal * (1 − rate)` |
 
@@ -307,33 +471,34 @@ Inside Senior/PWD, write the VAT rate as `private static final double VAT_RATE =
 
 Every flow: wrap in `try/catch (CbsException e)`; a failed step prints the message and returns to the role menu. Save every changed ArrayList before returning.
 
-- **Sign-up**: name, email, password, birthdate, optional saved payment → validate (§12) → email unique → store hash → create empty `bookings_<id>.txt` → returns to Guest menu (user then logs in).
-- **Login**: email + password → compare hashes → `AuthenticationException` on failure → return the user object.
+- **Sign-up**: name, email, password, birthdate, optional saved payment → validate (§12) → email unique → store the password → create empty `bookings_<id>.txt` → returns to Guest menu (user then logs in).
+- **Login**: email + password → compare with the stored password → `AuthenticationException` on failure or if `active=false` → return the user object.
 - **Search/filter** (Guest & Registered): any combination of genre, language, format, cinema location, date, time (blank = skip) → print matches as the §13 table with average review rating.
 - **Book online** (Registered User):
   1. Pick movie → pick an upcoming schedule.
   2. Overlap check (§8) → `TimeOverlapException`.
   3. Print seat map → enter seats `A1,A2` → each must exist in the hall, not repeat, not be in the ledger; count ≤ ticket limit. Seats are held only in a local `ArrayList<String>` — **nothing is written yet**.
   4. Snacks: loop (snack id, qty 1–10, `0` to finish); stock check; only `active` snacks.
-  5. Discount menu (none/Senior/PWD/Student + ID) and optional promo (§9).
+  5. Discount menu (none/Senior/PWD/Student; for the last three ask `Do you have a valid ID? (Y/N)`) and optional promo (§9).
   6. Show summary (tickets, discount, snacks, total) → confirm `Y/N`.
   7. Choose payment (saved method offered first) → number → `payment.pay()`; on `PaymentFailedException` let the user retry or abort (nothing written yet).
   8. On success: `generateId()`; add ledger rows; save booking to `bookings_<id>.txt`; add Transaction `SUCCESS`; deduct stock and write `snack_orders.txt`; print the §13 e-ticket.
 - **Cancel** (Registered User): choose own CONFIRMED booking with an upcoming showtime → confirm → status `CANCELLED`; delete its ledger rows; its Transaction → `REFUND_PENDING`. Snack stock is not restored.
 - **Refund** (Customer Service): list `REFUND_PENDING` → choose one → Full (`refundAmount = totalAmount`) or Partial (0.01 to total) → status `REFUNDED`.
 - **View user bookings** (Customer Service): enter email → print that user's file.
-- **Counter booking** (Cashier): same as online except: ask `customerName` (2–30 letters/spaces); no overlap check; `ownerType=GUEST`, `ownerId=0`; any payment incl. `CashPayment`; booking saved to `counter_bookings.txt`; print receipt. Ticket limit still applies.
+- **Counter booking** (Cashier): same as online except: set `customerName = "Walk-in"` (no prompt); no overlap check; `ownerType=GUEST`, `ownerId=0`; any payment incl. `CashPayment`; booking saved to `counter_bookings.txt`; print receipt. Ticket limit still applies.
 - **Bulk** — Customer Service: requester name, contact (email or 11-digit mobile), schedule, seatCount 20–200 → `PENDING`. Admin: list `PENDING` → Approve or Reject (`reviewerId` = admin id). Approve = auto-assign the first N free seats (row by row); if fewer than N are free, refuse. Then write ledger rows, a `BULK` booking in `counter_bookings.txt`, and a `SUCCESS` Transaction using `BulkDiscount`. Bulk is exempt from the ticket limit.
 - **Admin CRUD**:
   - *Movies*: add/list/edit/remove — remove only if it has no schedules.
   - *Schedules*: add/edit/remove — §8 checks; remove only if no CONFIRMED bookings.
   - *Halls*: add/edit/remove — remove only if no schedules use it.
   - *Discounts*: create/edit/extend/deactivate (`active=false`, never delete).
-  - *Staff*: create CASHIER / CUSTOMER_SERVICE / SNACK_MANAGER accounts.
+  - *Users*: list REGISTERED_USER accounts and deactivate one (`active=false`, never delete).
   - *Config*: edit §7 values (within allowed ranges).
 - **Snack Manager**: add, edit name/price, update stock, discontinue (`active=false`, never delete), low-stock list (`stock <= LOW_STOCK_THRESHOLD`).
-- **Review** (Registered User): choose a CONFIRMED booking whose showtime has passed → rating 1–5 + optional comment (≤100 chars) → one review per user per movie (resubmitting replaces it).
+- **Review** (Registered User): choose a movie from the movie list → rating 1–5 + optional comment (≤100 chars) → one review per user per movie (resubmitting replaces it).
 - **Edit profile**: name, birthdate, saved payment (each re-validated).
+- **Deactivate account** (Registered User) / **Manage users** (Admin): confirm `Y/N` → `active=false`; that account can no longer log in; its bookings stay.
 
 ## 12. Input Validation Rules (all via try/catch)
 
@@ -349,7 +514,6 @@ Every flow: wrap in `try/catch (CbsException e)`; a failed step prints the messa
 | Birthdate | `YYYY-MM-DD`, a real date (month 1–12, day valid for month), not in the future, age 5–120 |
 | Card number | exactly 16 digits |
 | E-wallet number | `09` + 9 digits |
-| Discount ID | 6–12 digits |
 | Duration | 30–300 minutes |
 | Ticket price | 50.00–1000.00 |
 | Hall size | rows 3–12, columns 4–20 |
@@ -375,10 +539,10 @@ Every flow: wrap in `try/catch (CbsException e)`; a failed step prints the messa
 
 | Folder | Owner | Files (one class per file) |
 | --- | --- | --- |
-| `src/titong_model-data/` | Titong | `Movie`, `Hall`, `Schedule`, `Booking`, `Transaction`, `Snack`, `SnackOrder`, `Discount`, `BulkBookingRequest`, `Review`, `SeatLedgerEntry`, `SystemConfig`, `DataStore` |
+| `src/titong_model-` | Titong | `Movie`, `Hall`, `Schedule`, `Booking`, `Transaction`, `Snack`, `SnackOrder`, `Discount`, `BulkBookingRequest`, `Review`, `SeatLedgerEntry`, `SystemConfig`, `DataStore` |
 | `src/peco_users-menus/` | Peco | `User`, `Guest`, `RegisteredUser`, `Cashier`, `CustomerService`, `SnackManager`, `Admin`, `Main`, `InputHelper` |
 | `src/mendoza_strategy/` | Mendoza | `PaymentStrategy`, `CreditCardPayment`, `DebitCardPayment`, `EWalletPayment`, `CashPayment`, `DiscountStrategy`, `SeniorDiscount`, `PWDDiscount`, `StudentDiscount`, `PromoDiscount`, `BulkDiscount` |
-| `src/cullarin_exceptions-logic/` | Cullarin | `CbsException` + the 10 exceptions in §5, `BookingManager`, `ReportManager` |
+| `src/cullarin_exceptions-logic/` | Cullarin | `CbsException` + the 9 exceptions in §5, `BookingManager`, `ReportManager` |
 
 ### 14.2 Using this guide with an AI
 
@@ -392,21 +556,21 @@ Every flow: wrap in `try/catch (CbsException e)`; a failed step prints the messa
 2. Obey §0 (Skill-Level Rules) and every rule in this guide.
 3. For anything outside the folder, code against the exact signatures in §14.3. Never rewrite a teammate's code and never invent different signatures.
 4. Work in the order of that folder's steps in §14.4 (Step 0 first). If the member names specific steps, do only those.
-5. Your output must contain: (a) every file with its full path; (b) the separate Git guide described in §14.5; (c) a short list of anything unclear that a teammate must confirm.
+5. Your output must contain: (a) every file with its full path; (b) the separate Git guide described in §14.5 and a short `README.md` (§14.6); (c) a short list of anything unclear that a teammate must confirm.
 
 ### 14.3 Cross-Folder Contract (exact signatures — never change without every owner agreeing)
 
-Constructors take every field of the §3 table **in table order**; getters `getX()` (booleans `isX()`); setters `setX(v)`; every model has `String toFileLine()`. Exceptions: one constructor `(String message)`. Users: `User(int id, String name, String email, String passwordHash)`; `RegisteredUser` adds `String birthdate, String savedPaymentType, String savedPaymentNumber`; staff classes take only the four base arguments; `public abstract User displayDashboard()`.
+Constructors take every field of the §3 table **in table order**; getters `getX()` (booleans `isX()`); setters `setX(v)`; every model has `String toFileLine()`. Exceptions: one constructor `(String message)`. Users: `User(int id, String name, String email, String password, boolean active)`; `RegisteredUser` adds `String birthdate, String savedPaymentType, String savedPaymentNumber`; staff classes take only the five base arguments; `public abstract User displayDashboard()`.
 
 | Class (owner) | Public signatures others may call |
 | --- | --- |
 | `DataStore` (Titong) | `static DataStore getInstance()` · `ArrayList<User> getUsers()` · `getMovies()` · `getHalls()` · `getSchedules()` · `getLedger()` · `getTransactions()` · `getSnacks()` · `getSnackOrders()` · `getDiscounts()` · `getBulkRequests()` · `getReviews()` (each returns the matching `ArrayList<...>`) · `void saveUsers()` … one `saveX()` per list · `int generateId()` · `int getConfigInt(String key)` · `void setConfig(String key, String value)` · `String getUserBookingsPath(int userId)` · `String getCounterBookingsPath()` · `void createUserBookingsFile(int userId)` · `ArrayList<Booking> loadBookings(String path)` · `void saveBookings(String path, ArrayList<Booking> list)` · `User findUserByEmail(String email)` · `Movie findMovieById(int id)` · `Schedule findScheduleById(int id)` · `Hall findHallById(int id)` · `Snack findSnackById(int id)` (find methods return `null` if absent) |
-| `InputHelper` (Peco, all `static`) | `int getValidInt(String prompt, int min, int max)` · `double getValidDouble(String prompt, double min, double max)` · `String getValidName(String prompt, int minLen, int maxLen)` · `String getValidText(String prompt, int minLen, int maxLen)` · `String getValidEmail(String prompt)` · `String getValidPassword(String prompt)` · `String getValidDate(String prompt)` · `String getValidTime(String prompt)` · `boolean getYesNo(String prompt)` · `String hashPassword(String plain)` |
+| `InputHelper` (Peco, all `static`) | `int getValidInt(String prompt, int min, int max)` · `double getValidDouble(String prompt, double min, double max)` · `String getValidName(String prompt, int minLen, int maxLen)` · `String getValidText(String prompt, int minLen, int maxLen)` · `String getValidEmail(String prompt)` · `String getValidPassword(String prompt)` · `String getValidDate(String prompt)` · `String getValidTime(String prompt)` · `boolean getYesNo(String prompt)` |
 | `BookingManager` (Cullarin, all `static`) | `int toMinutes(String hhmm)` · `String toTimeString(int minutes)` · `String today()` · `int nowMinutes()` · `double round2(double x)` · `int calculateAge(String birthdate)` · `void checkOverlap(int userId, Schedule s) throws TimeOverlapException` · `void checkScheduleConflict(Schedule s, int ignoreScheduleId) throws ScheduleConflictException` · `void printSeatMap(Schedule s)` · `void printTicket(Booking b)` · flows that prompt and save by themselves: `void bookOnline(RegisteredUser u)` · `void bookAtCounter(Cashier c)` · `void cancelBooking(RegisteredUser u)` · `void showBookingHistory(RegisteredUser u)` · `void submitReview(RegisteredUser u)` · `void processRefund(CustomerService cs)` · `void viewUserBookings(CustomerService cs)` · `void createBulkRequest(CustomerService cs)` · `void reviewBulkRequests(Admin a)` |
 | `ReportManager` (Cullarin, `static`) | `void printRevenueReport()` (asks for the date range itself) |
 | Strategies (Mendoza) | `PaymentStrategy { void pay(double amount, String accountNumber) throws PaymentFailedException; }` with `new CreditCardPayment()`, `new DebitCardPayment()`, `new EWalletPayment()`, `new CashPayment()` · `DiscountStrategy { double apply(double ticketSubtotal); }` with `new SeniorDiscount()`, `new PWDDiscount()`, `new StudentDiscount()`, `new PromoDiscount(String type, double value)`, `new BulkDiscount(int seatCount)` |
 
-Menu-owned work (Peco): Guest browsing/search/sign-up/login, edit profile, and all CRUD inside `Admin` (movies, halls, schedules, discounts, staff, config) and `SnackManager` (snacks). Those call the helpers above.
+Menu-owned work (Peco): Guest browsing/search/sign-up/login, edit profile, and all CRUD inside `Admin` (movies, halls, schedules, discounts, user accounts, config) and `SnackManager` (snacks). Those call the helpers above.
 
 ### 14.4 Commit Steps per Folder (each step = at least one commit)
 
@@ -415,26 +579,26 @@ Menu-owned work (Peco): Guest browsing/search/sign-up/login, edit profile, and a
 | Folder | Steps after Step 0 |
 | --- | --- |
 | `titong_model-data` | 1 `Movie`, `Hall` · 2 `Schedule`, `Booking` · 3 `Transaction`, `SeatLedgerEntry` · 4 `Snack`, `SnackOrder`, `Discount` · 5 `BulkBookingRequest`, `Review`, `SystemConfig` · 6 `DataStore` Singleton shell + empty lists + getters · 7 `generateId`, config load/save, first-run defaults · 8 users load/save (build the right subclass per role) · 9 movies, halls, schedules load/save · 10 ledger, transactions load/save · 11 snacks, snack orders, discounts load/save · 12 bulk requests, reviews, booking-file methods, `find...` methods |
-| `peco_users-menus` | 1 `User` + `InputHelper` basics (`Scanner`, `getValidInt`) · 2 rest of `InputHelper` · 3 `Guest` browsing + search/filter · 4 `Guest` sign-up · 5 `Guest` login · 6 `Main` loop · 7 `RegisteredUser` menu + edit profile · 8 `Cashier` · 9 `CustomerService` · 10 `SnackManager` · 11 `Admin` movies + halls CRUD · 12 `Admin` schedules, discounts · 13 `Admin` staff accounts, config, report + bulk-review menu entries |
+| `peco_users-menus` | 1 `User` + `InputHelper` basics (`Scanner`, `getValidInt`) · 2 rest of `InputHelper` · 3 `Guest` browsing + search/filter · 4 `Guest` sign-up · 5 `Guest` login · 6 `Main` loop · 7 `RegisteredUser` menu + edit profile · 8 `Cashier` · 9 `CustomerService` · 10 `SnackManager` · 11 `Admin` movies + halls CRUD · 12 `Admin` schedules, discounts · 13 `Admin` user accounts, config, report + bulk-review menu entries |
 | `mendoza_strategy` | 1 `PaymentStrategy` · 2 `CreditCardPayment`, `DebitCardPayment` · 3 `EWalletPayment`, `CashPayment` · 4 `DiscountStrategy` · 5 `SeniorDiscount`, `PWDDiscount` · 6 `StudentDiscount` · 7 `PromoDiscount` · 8 `BulkDiscount` |
-| `cullarin_exceptions-logic` | 1 `CbsException`, `InvalidInputException`, `AuthenticationException` · 2 the other 8 exceptions (two commits of 4) · 3 `BookingManager` helpers (time, round, age) · 4 `checkOverlap`, `checkScheduleConflict` · 5 `printSeatMap` + seat selection · 6 `bookOnline` · 7 `printTicket`, `cancelBooking`, `showBookingHistory` · 8 `submitReview` · 9 `processRefund`, `viewUserBookings` · 10 `bookAtCounter` · 11 `createBulkRequest`, `reviewBulkRequests` · 12 `ReportManager` totals · 13 `ReportManager` best-sellers |
+| `cullarin_exceptions-logic` | 1 `CbsException`, `InvalidInputException`, `AuthenticationException` · 2 the other 7 exceptions (two commits) · 3 `BookingManager` helpers (time, round, age) · 4 `checkOverlap`, `checkScheduleConflict` · 5 `printSeatMap` + seat selection · 6 `bookOnline` · 7 `printTicket`, `cancelBooking`, `showBookingHistory` · 8 `submitReview` · 9 `processRefund`, `viewUserBookings` · 10 `bookAtCounter` · 11 `createBulkRequest`, `reviewBulkRequests` · 12 `ReportManager` totals · 13 `ReportManager` best-sellers |
 
 ### 14.5 GitHub Guide — MANDATORY in every output
 
 Progress must show on GitHub in **small increments, not one big commit or push**. Every time the AI/developer produces code for a member, it must also produce a **separate** file named `GIT_STEPS_<member>.md` (saved inside that member's own folder and also shown in the reply). It must contain (examples below use one member's names — substitute the actual member, folder, and branch):
 
 1. **Setup**: `git clone <repo-url>`, then `git checkout -b feature/peco-users-menus`.
-2. **One section per step in §14.4** (only the steps that were built), each with: the files; the compile check; the exact `git add <file paths>`; `git commit -m "<folder>: <what changed>"` (example: `peco_users-menus: add Step 1 classes`); `git push -u origin feature/peco-users-menus` the first time and `git push` after; and a line "On GitHub you should see: …".
+2. **One section per step in §14.4** (only the steps that were built), each with: the files; the check that VS Code shows no red errors; the exact `git add <file paths>`; `git commit -m "<folder>: <what changed>"` (example: `peco_users-menus: add Step 1 classes`); `git push -u origin feature/peco-users-menus` the first time and `git push` after; and a line "On GitHub you should see: …".
 3. **Milestone merges**: after Step 0 and then after every 3 steps, open a Pull Request into `main`; a teammate reviews and merges it; then everyone runs `git checkout main`, `git pull origin main`, `git checkout feature/peco-users-menus`, `git merge main`.
 4. **Fixes**: if a push is rejected, run `git pull origin feature/peco-users-menus` and push again. Never `git push --force`.
 
 **Hard rules the Git guide must state and the code must respect**
 
 - At least **one commit per step** in §14.4 — never fewer commits than steps; each commit touches **at most 3 files**, all inside the member's own folder (the Git guide file itself is committed with the last step).
-- Compile before every commit (`javac -d out src/titong_model-data/*.java src/peco_users-menus/*.java src/mendoza_strategy/*.java src/cullarin_exceptions-logic/*.java`); never commit code that does not compile.
+- Before every commit, check that VS Code shows **no red errors** in your files (pull `main` first) and that `Main` still runs once everyone's code is merged.
 - Push after **every** commit.
 - Never use `git add .` or `git add -A`; add exact paths only.
-- Never commit `out/` or the runtime files in `data/` (they are created when the program runs).
+- Never commit the `.txt` data files or the `bin/` / `out/` folders (they are generated when you run the program).
 - Commit messages start with the folder name, then a short description.
 
 ### 14.6 One-Time Repo Setup (done once by Titong, in its own commits)
@@ -446,13 +610,12 @@ CinemaBookingSystem/
     peco_users-menus/
     mendoza_strategy/
     cullarin_exceptions-logic/
-  data/.gitkeep
   .gitignore
   .vscode/settings.json
   README.md
 ```
 
-Each folder above is a **source root, not a Java package** — all classes stay in the default package, so there are no `package` or `import` lines for our own classes. Without the setup below, an IDE may report "package does not match folder".
+Each folder above is a **source root, not a Java package** — all classes stay in the default package, so there are no `package` or `import` lines for our own classes. Without the `.vscode/settings.json` below, VS Code may report "package does not match folder".
 
 - **VS Code** — commit `.vscode/settings.json`:
 
@@ -468,9 +631,8 @@ Each folder above is a **source root, not a Java package** — all classes stay 
 }
 ```
 
-- **IntelliJ** — right-click each member folder → *Mark Directory as* → *Sources Root*.
-- **Terminal** (project root): compile `javac -d out src/titong_model-data/*.java src/peco_users-menus/*.java src/mendoza_strategy/*.java src/cullarin_exceptions-logic/*.java` · run `java -cp out Main`.
-- `.gitignore`: `out/`, `data/*.txt`, `*.class`, `.idea/`, `*.iml`. Add an empty `.gitkeep` in every empty folder so Git tracks it.
+- `.gitignore` (one file, three lines): `*.txt` (the storage files the program creates when it runs), `bin/` and `out/` (folders where VS Code puts the compiled `.class` files — a `.class` file is the version of a `.java` file that the computer runs; VS Code makes them automatically, so they are never uploaded).
+- `README.md` (short, written by the AI): project name, one sentence on what the program does, how to run it (open `Main.java` in VS Code and press Run), and the table of members and folders.
 
 ## 15. Merge & Test Order
 
