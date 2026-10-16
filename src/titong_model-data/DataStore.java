@@ -35,6 +35,13 @@ public class DataStore {
         loadMovies();
         loadHalls();
         loadSchedules();
+        loadLedger();
+        loadTransactions();
+        loadSnacks();
+        loadSnackOrders();
+        loadDiscounts();
+        loadBulkRequests();
+        loadReviews();
     }
 
     public ArrayList<User> getUsers() { return users; }
@@ -288,71 +295,304 @@ public class DataStore {
         }
     }
 
+    // seat_ledger.txt
+    private void loadLedger() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("seat_ledger.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                ledger.add(new SeatLedgerEntry(Integer.parseInt(p[0]), p[1], Integer.parseInt(p[2])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
+    }
+
     public void saveLedger() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("seat_ledger.txt"));
+            for (SeatLedgerEntry entry : ledger) {
+                pw.println(entry.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save seat_ledger.txt");
+        }
+    }
+
+    // transactions.txt
+    private void loadTransactions() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("transactions.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                transactions.add(new Transaction(Integer.parseInt(p[0]), Integer.parseInt(p[1]), p[2],
+                        Integer.parseInt(p[3]), Integer.parseInt(p[4]), Integer.parseInt(p[5]),
+                        Double.parseDouble(p[6]), Double.parseDouble(p[7]), Double.parseDouble(p[8]),
+                        p[9], p[10], Double.parseDouble(p[11]),
+                        p[12]));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveTransactions() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("transactions.txt"));
+            for (Transaction t : transactions) {
+                pw.println(t.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save transactions.txt");
+        }
+    }
+
+    // snacks.txt
+    private void loadSnacks() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("snacks.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                snacks.add(new Snack(Integer.parseInt(p[0]), p[1], Double.parseDouble(p[2]),
+                        Integer.parseInt(p[3]), p[4].equals("true")));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveSnacks() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("snacks.txt"));
+            for (Snack sn : snacks) {
+                pw.println(sn.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save snacks.txt");
+        }
+    }
+
+    // snack_orders.txt
+    private void loadSnackOrders() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("snack_orders.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                snackOrders.add(new SnackOrder(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]),
+                        Integer.parseInt(p[3]), Double.parseDouble(p[4])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveSnackOrders() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("snack_orders.txt"));
+            for (SnackOrder so : snackOrders) {
+                pw.println(so.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save snack_orders.txt");
+        }
+    }
+
+    // discounts_promos.txt
+    private void loadDiscounts() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("discounts_promos.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                discounts.add(new Discount(p[0], p[1], Double.parseDouble(p[2]),
+                        p[3].equals("true"), p[4], p[5].equals("true")));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveDiscounts() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("discounts_promos.txt"));
+            for (Discount d : discounts) {
+                pw.println(d.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save discounts_promos.txt");
+        }
+    }
+
+    // bulk_requests.txt
+    private void loadBulkRequests() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("bulk_requests.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                bulkRequests.add(new BulkBookingRequest(Integer.parseInt(p[0]), p[1], p[2],
+                        Integer.parseInt(p[3]), Integer.parseInt(p[4]), p[5],
+                        Integer.parseInt(p[6])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveBulkRequests() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("bulk_requests.txt"));
+            for (BulkBookingRequest b : bulkRequests) {
+                pw.println(b.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save bulk_requests.txt");
+        }
+    }
+
+    // reviews.txt
+    private void loadReviews() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("reviews.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                reviews.add(new Review(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]),
+                        Integer.parseInt(p[3]), p[4], p[5]));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveReviews() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("reviews.txt"));
+            for (Review r : reviews) {
+                pw.println(r.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save reviews.txt");
+        }
     }
 
+    // booking files (one per registered user + counter_bookings.txt)
     public String getUserBookingsPath(int userId) {
-        return ""; 
+        return "bookings_" + userId + ".txt";
     }
 
     public String getCounterBookingsPath() {
-        return ""; 
+        return "counter_bookings.txt";
     }
 
     public void createUserBookingsFile(int userId) {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter(getUserBookingsPath(userId)));
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not create " + getUserBookingsPath(userId));
+        }
     }
 
     public ArrayList<Booking> loadBookings(String path) {
-        return new ArrayList<Booking>(); 
+        ArrayList<Booking> list = new ArrayList<>();
+        try {
+            BufferedReader br = new BufferedReader(new FileReader(path));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                list.add(new Booking(Integer.parseInt(p[0]), p[1], Integer.parseInt(p[2]),
+                        p[3], Integer.parseInt(p[4]), p[5],
+                        p[6], Double.parseDouble(p[7]), p[8]));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
+        return list;
     }
 
     public void saveBookings(String path, ArrayList<Booking> list) {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter(path));
+            for (Booking b : list) {
+                pw.println(b.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save " + path);
+        }
     }
 
+    // find methods return null when nothing matches
     public User findUserByEmail(String email) {
-        return null; 
+        for (User u : users) {
+            if (u.getEmail().equalsIgnoreCase(email)) {
+                return u;
+            }
+        }
+        return null;
     }
 
     public Movie findMovieById(int id) {
-        return null; 
+        for (Movie m : movies) {
+            if (m.getId() == id) {
+                return m;
+            }
+        }
+        return null;
     }
 
     public Schedule findScheduleById(int id) {
-        return null; 
+        for (Schedule s : schedules) {
+            if (s.getId() == id) {
+                return s;
+            }
+        }
+        return null;
     }
 
     public Hall findHallById(int id) {
-        return null; 
+        for (Hall h : halls) {
+            if (h.getId() == id) {
+                return h;
+            }
+        }
+        return null;
     }
 
     public Snack findSnackById(int id) {
-        return null; 
+        for (Snack sn : snacks) {
+            if (sn.getId() == id) {
+                return sn;
+            }
+        }
+        return null;
     }
 }
