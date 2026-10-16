@@ -1,0 +1,9 @@
+{
+  "java.project.sourcePaths": [
+    "src/titong_model-data",
+    "src/peco_users-menus",
+    "src/mendoza_strategy",
+    "src/cullarin_exceptions-logic"
+  ],
+  "java.project.outputPath": "out"
+}
