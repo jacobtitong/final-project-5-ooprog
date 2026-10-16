@@ -37,6 +37,9 @@ public class DataStore {
         loadSchedules();
         loadLedger();
         loadTransactions();
+        loadSnacks();
+        loadSnackOrders();
+        loadDiscounts();
     }
 
     public ArrayList<User> getUsers() { return users; }
@@ -350,16 +353,91 @@ public class DataStore {
         }
     }
 
+    // snacks.txt
+    private void loadSnacks() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("snacks.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                snacks.add(new Snack(Integer.parseInt(p[0]), p[1], Double.parseDouble(p[2]),
+                        Integer.parseInt(p[3]), p[4].equals("true")));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
+    }
+
     public void saveSnacks() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("snacks.txt"));
+            for (Snack sn : snacks) {
+                pw.println(sn.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save snacks.txt");
+        }
+    }
+
+    // snack_orders.txt
+    private void loadSnackOrders() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("snack_orders.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                snackOrders.add(new SnackOrder(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]),
+                        Integer.parseInt(p[3]), Double.parseDouble(p[4])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveSnackOrders() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("snack_orders.txt"));
+            for (SnackOrder so : snackOrders) {
+                pw.println(so.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save snack_orders.txt");
+        }
+    }
+
+    // discounts_promos.txt
+    private void loadDiscounts() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("discounts_promos.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                discounts.add(new Discount(p[0], p[1], Double.parseDouble(p[2]),
+                        p[3].equals("true"), p[4], p[5].equals("true")));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveDiscounts() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("discounts_promos.txt"));
+            for (Discount d : discounts) {
+                pw.println(d.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save discounts_promos.txt");
+        }
     }
 
     public void saveBulkRequests() {
