@@ -1,4 +1,3 @@
-// Step 0 stub: signatures only, filled in at Step 2
 public class Booking {
     public Booking(int id, String ownerType, int ownerId, String customerName,
             int scheduleId, String seats, String status, double totalPaid,
