@@ -31,6 +31,7 @@ public class DataStore {
     // loads every file once, when the single DataStore is created
     private void loadAll() {
         loadConfig();
+        loadUsers();
     }
 
     public ArrayList<User> getUsers() { return users; }
@@ -121,7 +122,78 @@ public class DataStore {
         }
     }
 
+    // users
+    private void loadUsers() {
+        File file = new File("users.txt");
+        if (!file.exists()) {
+            users.add(new Admin(generateId(), "Admin", "admin@cinema.com", "Admin123", true));
+            users.add(new Cashier(generateId(), "Cashier", "cashier@cinema.com", "Cashier123", true));
+            users.add(new CustomerService(generateId(), "Customer Service", "service@cinema.com", "Service123", true));
+            users.add(new SnackManager(generateId(), "Snack Manager", "snacks@cinema.com", "Snacks123", true));
+            saveUsers();
+        } else {
+            try {
+                BufferedReader br = new BufferedReader(new FileReader("users.txt"));
+                String line = br.readLine();
+                while (line != null) {
+                    String[] p = line.split(";");
+                    int id = Integer.parseInt(p[0]);
+                    String role = p[1];
+                    boolean active = p[5].equals("true");
+                    if (role.equals("REGISTERED_USER")) {
+                        users.add(new RegisteredUser(id, p[2], p[3], p[4], active, p[6], p[7], p[8]));
+                    } else if (role.equals("CASHIER")) {
+                        users.add(new Cashier(id, p[2], p[3], p[4], active));
+                    } else if (role.equals("CUSTOMER_SERVICE")) {
+                        users.add(new CustomerService(id, p[2], p[3], p[4], active));
+                    } else if (role.equals("SNACK_MANAGER")) {
+                        users.add(new SnackManager(id, p[2], p[3], p[4], active));
+                    } else if (role.equals("ADMIN")) {
+                        users.add(new Admin(id, p[2], p[3], p[4], active));
+                    }
+                    line = br.readLine();
+                }
+                br.close();
+            } catch (IOException e) {
+                // could not read users.txt
+            }
+        }
+    }
+
     public void saveUsers() {
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("users.txt"));
+            for (User u : users) {
+                String role = "";
+                String birthdate = "none";
+                String paymentType = "none";
+                String paymentNumber = "none";
+                String className = u.getClass().getSimpleName();
+
+                if (className.equals("RegisteredUser")) {
+                    RegisteredUser r = (RegisteredUser) u;
+                    role = "REGISTERED_USER";
+                    birthdate = r.getBirthdate();
+                    paymentType = r.getSavedPaymentType();
+                    paymentNumber = r.getSavedPaymentNumber();
+                } else if (className.equals("Cashier")) {
+                    role = "CASHIER";
+                } else if (className.equals("CustomerService")) {
+                    role = "CUSTOMER_SERVICE";
+                } else if (className.equals("SnackManager")) {
+                    role = "SNACK_MANAGER";
+                } else if (className.equals("Admin")) {
+                    role = "ADMIN";
+                }
+
+                pw.println(u.getId() + ";" + role + ";" + u.getName() + ";" + u.getEmail() + ";"
+                        + u.getPassword() + ";" + u.isActive() + ";" + birthdate + ";" + paymentType + ";"
+                        + paymentNumber);
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save users.txt");
+        }
     }
 
     public void saveMovies() {
