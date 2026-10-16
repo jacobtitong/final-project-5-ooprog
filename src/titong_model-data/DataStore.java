@@ -35,6 +35,8 @@ public class DataStore {
         loadMovies();
         loadHalls();
         loadSchedules();
+        loadLedger();
+        loadTransactions();
     }
 
     public ArrayList<User> getUsers() { return users; }
@@ -288,12 +290,64 @@ public class DataStore {
         }
     }
 
+    // seat_ledger.txt
+    private void loadLedger() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("seat_ledger.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                ledger.add(new SeatLedgerEntry(Integer.parseInt(p[0]), p[1], Integer.parseInt(p[2])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
+    }
+
     public void saveLedger() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("seat_ledger.txt"));
+            for (SeatLedgerEntry entry : ledger) {
+                pw.println(entry.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save seat_ledger.txt");
+        }
+    }
+
+    // transactions.txt
+    private void loadTransactions() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("transactions.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                transactions.add(new Transaction(Integer.parseInt(p[0]), Integer.parseInt(p[1]), p[2],
+                        Integer.parseInt(p[3]), Integer.parseInt(p[4]), Integer.parseInt(p[5]),
+                        Double.parseDouble(p[6]), Double.parseDouble(p[7]), Double.parseDouble(p[8]),
+                        p[9], p[10], Double.parseDouble(p[11]),
+                        p[12]));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveTransactions() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("transactions.txt"));
+            for (Transaction t : transactions) {
+                pw.println(t.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save transactions.txt");
+        }
     }
 
     public void saveSnacks() {
