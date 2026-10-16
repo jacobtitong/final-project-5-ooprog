@@ -32,6 +32,9 @@ public class DataStore {
     private void loadAll() {
         loadConfig();
         loadUsers();
+        loadMovies();
+        loadHalls();
+        loadSchedules();
     }
 
     public ArrayList<User> getUsers() { return users; }
@@ -196,16 +199,93 @@ public class DataStore {
         }
     }
 
+    // movies.txt
+    private void loadMovies() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("movies.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                movies.add(new Movie(Integer.parseInt(p[0]), p[1], p[2],
+                        p[3], p[4], p[5],
+                        Integer.parseInt(p[6])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
+    }
+
     public void saveMovies() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("movies.txt"));
+            for (Movie m : movies) {
+                pw.println(m.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save movies.txt");
+        }
+    }
+
+    // halls.txt
+    private void loadHalls() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("halls.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                halls.add(new Hall(Integer.parseInt(p[0]), p[1], p[2],
+                        Integer.parseInt(p[3]), Integer.parseInt(p[4])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveHalls() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("halls.txt"));
+            for (Hall h : halls) {
+                pw.println(h.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save halls.txt");
+        }
+    }
+
+    // schedules.txt
+    private void loadSchedules() {
+        try {
+            BufferedReader br = new BufferedReader(new FileReader("schedules.txt"));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split(";");
+                schedules.add(new Schedule(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]),
+                        p[3], p[4], p[5],
+                        Double.parseDouble(p[6])));
+                line = br.readLine();
+            }
+            br.close();
+        } catch (IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 
     public void saveSchedules() {
-        
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter("schedules.txt"));
+            for (Schedule s : schedules) {
+                pw.println(s.toFileLine());
+            }
+            pw.close();
+        } catch (IOException e) {
+            System.out.println("Error: could not save schedules.txt");
+        }
     }
 
     public void saveLedger() {
