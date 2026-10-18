@@ -111,8 +111,133 @@ public class BookingManager {
         }
     }
 
+    // ----- seat map and seat selection -----
+
     public static void printSeatMap(Schedule s) {
-        // stub: filled in Step 5
+        DataStore ds = DataStore.getInstance();
+        Hall hall = ds.findHallById(s.getHallId());
+
+        if (hall == null) {
+            System.out.println("Error: Hall not found.");
+        } else {
+            int width = hall.getColumns() * 4;
+            String padding = "";
+            String line = "";
+            for (int i = 0; i < (width - 6) / 2; i++) {
+                padding += " ";
+            }
+            for (int i = 0; i < width; i++) {
+                line += "-";
+            }
+
+            System.out.println("\n" + padding + "SCREEN");
+            System.out.println(line);
+            for (int r = 0; r < hall.getRows(); r++) {
+                String row = "";
+                for (int c = 1; c <= hall.getColumns(); c++) {
+                    String code = seatCode(r, c);
+                    if (isSeatTaken(s.getId(), code)) {
+                        row += String.format("%-4s", "XX");
+                    } else {
+                        row += String.format("%-4s", code);
+                    }
+                }
+                System.out.println(row);
+            }
+            System.out.println("XX = taken");
+        }
+    }
+
+    // row letter + column number, for example row 1, column 7 gives B7
+    private static String seatCode(int rowIndex, int column) {
+        return "" + (char) ('A' + rowIndex) + column;
+    }
+
+    private static boolean isSeatTaken(int scheduleId, String code) {
+        DataStore ds = DataStore.getInstance();
+
+        for (SeatLedgerEntry entry : ds.getLedger()) {
+            if (entry.getScheduleId() == scheduleId && entry.getSeatCode().equals(code)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static int countFreeSeats(Schedule s, Hall hall) {
+        DataStore ds = DataStore.getInstance();
+        int taken = 0;
+
+        for (SeatLedgerEntry entry : ds.getLedger()) {
+            if (entry.getScheduleId() == s.getId()) {
+                taken++;
+            }
+        }
+        return hall.getRows() * hall.getColumns() - taken;
+    }
+
+    // asks for seats like A1,A2 and checks every rule; nothing is saved here
+    private static ArrayList<String> chooseSeats(Schedule s, int limit) throws SeatUnavailableException, TicketLimitExceededException {
+        DataStore ds = DataStore.getInstance();
+        Hall hall = ds.findHallById(s.getHallId());
+
+        if (hall == null) {
+            throw new SeatUnavailableException("The hall for this showing was not found.");
+        }
+        if (countFreeSeats(s, hall) <= 0) {
+            throw new SeatUnavailableException("This showing is sold out.");
+        }
+
+        printSeatMap(s);
+        String input = InputHelper.getValidText("\nEnter seats separated by commas (example A1,A2): ", 2, 100);
+        String[] parts = input.split(",");
+        if (parts.length > limit) {
+            throw new TicketLimitExceededException("You can book at most " + limit + " tickets per transaction.");
+        }
+
+        ArrayList<String> seats = new ArrayList<>();
+        for (String part : parts) {
+            String code = part.trim().toUpperCase();
+            if (!code.matches("[A-Z][0-9]{1,2}")) {
+                throw new SeatUnavailableException("Seat code " + code + " is not valid. Use a letter and a number like B7.");
+            }
+            int row = code.charAt(0) - 'A';
+            int column = Integer.parseInt(code.substring(1));
+            if (row >= hall.getRows() || column < 1 || column > hall.getColumns()) {
+                throw new SeatUnavailableException("Seat " + code + " does not exist in this hall.");
+            }
+            code = seatCode(row, column);
+
+            for (String chosen : seats) {
+                if (chosen.equals(code)) {
+                    throw new SeatUnavailableException("Seat " + code + " was entered more than once.");
+                }
+            }
+            if (isSeatTaken(s.getId(), code)) {
+                throw new SeatUnavailableException("Seat " + code + " is already taken.");
+            }
+            seats.add(code);
+        }
+        return seats;
+    }
+
+    // the first free seats, row by row (used when a bulk request is approved)
+    private static ArrayList<String> findFreeSeats(Schedule s, int count) {
+        DataStore ds = DataStore.getInstance();
+        Hall hall = ds.findHallById(s.getHallId());
+        ArrayList<String> seats = new ArrayList<>();
+
+        if (hall != null) {
+            for (int r = 0; r < hall.getRows(); r++) {
+                for (int c = 1; c <= hall.getColumns(); c++) {
+                    String code = seatCode(r, c);
+                    if (seats.size() < count && !isSeatTaken(s.getId(), code)) {
+                        seats.add(code);
+                    }
+                }
+            }
+        }
+        return seats;
     }
 
     public static void bookOnline(RegisteredUser u) {
