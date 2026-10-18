@@ -80,6 +80,14 @@ public class ReportManager {
                 }
             }
 
+            // best sellers: sort each pair of lists, then print the top 5
+            sortByCount(movieIds, movieTickets, movieRevenue);
+            System.out.println("\n--- Best-selling movies (by tickets sold) ---");
+            printTopFive(movieIds, movieTickets, movieRevenue, true);
+
+            sortByCount(snackIds, snackQuantities, snackRevenue);
+            System.out.println("\n--- Best-selling snacks (by quantity sold) ---");
+            printTopFive(snackIds, snackQuantities, snackRevenue, false);
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
         }
@@ -131,5 +139,46 @@ public class ReportManager {
             return "Unknown snack";
         }
         return s.getName();
+    }
+
+    // nested-for selection sort, biggest count first; the three lists move together
+    private static void sortByCount(ArrayList<Integer> ids, ArrayList<Integer> counts, ArrayList<Double> revenue) {
+        for (int i = 0; i < counts.size() - 1; i++) {
+            int best = i;
+            for (int j = i + 1; j < counts.size(); j++) {
+                if (counts.get(j) > counts.get(best)) {
+                    best = j;
+                }
+            }
+
+            int tempId = ids.get(i);
+            ids.set(i, ids.get(best));
+            ids.set(best, tempId);
+
+            int tempCount = counts.get(i);
+            counts.set(i, counts.get(best));
+            counts.set(best, tempCount);
+
+            double tempRevenue = revenue.get(i);
+            revenue.set(i, revenue.get(best));
+            revenue.set(best, tempRevenue);
+        }
+    }
+
+    private static void printTopFive(ArrayList<Integer> ids, ArrayList<Integer> counts, ArrayList<Double> revenue, boolean isMovie) {
+        if (ids.size() == 0) {
+            System.out.println("No sales in this period.");
+        } else {
+            System.out.printf("%-4s | %-24s | %-8s | %-12s%n", "Rank", "Name", "Sold", "Revenue");
+            int limit = Math.min(5, ids.size());
+            for (int i = 0; i < limit; i++) {
+                String name = snackName(ids.get(i));
+                if (isMovie) {
+                    name = movieTitle(ids.get(i));
+                }
+                System.out.printf("%-4d | %-24.24s | %-8d | Php %-8.2f%n",
+                        i + 1, name, counts.get(i), BookingManager.round2(revenue.get(i)));
+            }
+        }
     }
 }
