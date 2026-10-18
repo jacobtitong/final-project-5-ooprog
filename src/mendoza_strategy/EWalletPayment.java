@@ -1,7 +1,11 @@
-// Step 0 stub: signatures only, filled in at Step 3
 public class EWalletPayment implements PaymentStrategy {
     @Override
     public void pay(double amount, String accountNumber) throws PaymentFailedException {
-        // stub: accepts every payment until Step 3
+        if (amount <= 0) {
+            throw new PaymentFailedException("Amount must be greater than 0.");
+        }
+        if (!accountNumber.matches("09[0-9]{9}")) {
+            throw new PaymentFailedException("E-wallet number must be 11 digits starting with 09.");
+        }
     }
 }
