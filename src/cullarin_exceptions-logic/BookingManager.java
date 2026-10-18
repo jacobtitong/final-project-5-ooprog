@@ -1,5 +1,6 @@
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 
 public class BookingManager {
     // ----- time, money and age helpers -----
@@ -56,12 +57,58 @@ public class BookingManager {
         return "BK-" + String.format("%06d", id);
     }
 
+    // ----- overlap checks (window = start - BEFORE .. start + duration + AFTER) -----
+
+    private static int windowStart(Schedule s) {
+        return toMinutes(s.getStartTime()) - DataStore.getInstance().getConfigInt("GRACE_PERIOD_BEFORE_MINUTES");
+    }
+
+    private static int windowEnd(Schedule s) {
+        DataStore ds = DataStore.getInstance();
+        Movie m = ds.findMovieById(s.getMovieId());
+        int duration = 0;
+
+        if (m != null) {
+            duration = m.getDurationMinutes();
+        }
+        return toMinutes(s.getStartTime()) + duration + ds.getConfigInt("GRACE_PERIOD_AFTER_MINUTES");
+    }
+
+    // two windows on the same date overlap if startA < endB && startB < endA (touching is allowed)
+    private static boolean windowsOverlap(Schedule a, Schedule b) {
+        return a.getDate().equals(b.getDate()) && windowStart(a) < windowEnd(b) && windowStart(b) < windowEnd(a);
+    }
+
     public static void checkOverlap(int userId, Schedule s) throws TimeOverlapException {
-        // stub: filled in Step 4
+        DataStore ds = DataStore.getInstance();
+        ArrayList<Booking> bookings = ds.loadBookings(ds.getUserBookingsPath(userId));
+
+        for (Booking b : bookings) {
+            if (b.getStatus().equals("CONFIRMED")) {
+                Schedule other = ds.findScheduleById(b.getScheduleId());
+                if (other != null && windowsOverlap(s, other)) {
+                    throw new TimeOverlapException("This showing overlaps your booking " + bookingRef(b.getId())
+                            + " (" + other.getStartTime() + " on " + other.getDate() + ").");
+                }
+            }
+        }
     }
 
     public static void checkScheduleConflict(Schedule s, int ignoreScheduleId) throws ScheduleConflictException {
-        // stub: filled in Step 4
+        DataStore ds = DataStore.getInstance();
+
+        if (ds.findMovieById(s.getMovieId()) == null) {
+            throw new ScheduleConflictException("Movie not found.");
+        }
+        if (windowStart(s) < 0 || windowEnd(s) > 1439) {
+            throw new ScheduleConflictException("The showing, with its grace periods, must stay within the same day (00:00-23:59).");
+        }
+        for (Schedule other : ds.getSchedules()) {
+            if (other.getId() != ignoreScheduleId && other.getHallId() == s.getHallId() && windowsOverlap(s, other)) {
+                throw new ScheduleConflictException("This overlaps schedule " + other.getId() + " in the same hall ("
+                        + other.getStartTime() + " on " + other.getDate() + ").");
+            }
+        }
     }
 
     public static void printSeatMap(Schedule s) {
