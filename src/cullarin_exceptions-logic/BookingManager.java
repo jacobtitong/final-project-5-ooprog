@@ -861,12 +861,77 @@ public class BookingManager {
         }
     }
 
+    // ----- customer service: refunds and a user's bookings -----
+
     public static void processRefund(CustomerService cs) {
-        // stub: filled in Step 9
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            ArrayList<Transaction> pending = new ArrayList<>();
+            for (Transaction t : ds.getTransactions()) {
+                if (t.getStatus().equals("REFUND_PENDING")) {
+                    pending.add(t);
+                }
+            }
+            if (pending.size() == 0) {
+                throw new InvalidInputException("There are no refunds waiting.");
+            }
+
+            String line = "------------------------------------------------------------------------";
+            System.out.println("\n" + line);
+            System.out.printf("%-6s | %-10s | %-16s | %-7s | %-12s | %-8s%n", "Txn ID", "Booking", "Owner", "Tickets", "Total", "Method");
+            System.out.println(line);
+            for (Transaction t : pending) {
+                System.out.printf("%-6d | %-10s | %-16.16s | %-7d | Php %-8.2f | %-8s%n",
+                        t.getId(), bookingRef(t.getBookingId()), t.getOwnerType(), t.getTicketCount(), t.getTotalAmount(), t.getMethod());
+            }
+
+            int id = InputHelper.getValidInt("Transaction ID to refund: ", 1, 999999);
+            Transaction chosen = null;
+            for (Transaction t : pending) {
+                if (t.getId() == id) {
+                    chosen = t;
+                }
+            }
+            if (chosen == null) {
+                throw new InvalidInputException("Choose a transaction ID from the list.");
+            }
+
+            System.out.printf("\n1 - Full refund (Php %.2f)\n2 - Partial refund\n", chosen.getTotalAmount());
+            int option = InputHelper.getValidInt("--> Option: ", 1, 2);
+            double amount = chosen.getTotalAmount();
+            if (option == 2) {
+                amount = InputHelper.getValidDouble("Refund amount (0.01-" + String.format("%.2f", chosen.getTotalAmount()) + "): ",
+                        0.01, chosen.getTotalAmount());
+            }
+
+            chosen.setRefundAmount(round2(amount));
+            chosen.setStatus("REFUNDED");
+            ds.saveTransactions();
+            System.out.printf("Refund of Php %.2f recorded by %s.%n", round2(amount), cs.getName());
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     public static void viewUserBookings(CustomerService cs) {
-        // stub: filled in Step 9
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            String email = InputHelper.getValidEmail("User email: ");
+            User found = ds.findUserByEmail(email);
+            if (found == null) {
+                throw new InvalidInputException("No user was found with that email.");
+            }
+            if (!(found instanceof RegisteredUser)) {
+                throw new InvalidInputException("Only registered users have bookings.");
+            }
+
+            System.out.println("\n--- BOOKINGS OF " + found.getName() + " ---");
+            printBookingTable(ds.loadBookings(ds.getUserBookingsPath(found.getId())));
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     public static void bookAtCounter(Cashier c) {
