@@ -1,7 +1,10 @@
-// Step 0 stub: signatures only, filled in at Step 5
 public class SeniorDiscount implements DiscountStrategy {
+    private static final double VAT_RATE = 0.12;
+
     @Override
     public double apply(double ticketSubtotal) {
-        return ticketSubtotal; // stub: no discount until Step 5
+        double result = (ticketSubtotal / (1 + VAT_RATE)) * 0.80;
+        result = Math.round(result * 100) / 100.0;
+        return Math.max(0, result);
     }
 }
