@@ -1,26 +1,59 @@
+import java.time.LocalDate;
+import java.time.LocalTime;
+
 public class BookingManager {
+    // ----- time, money and age helpers -----
+
     public static int toMinutes(String hhmm) {
-        return 0; // stub: filled in Step 3
+        String[] parts = hhmm.split(":");
+        return Integer.parseInt(parts[0]) * 60 + Integer.parseInt(parts[1]);
     }
 
     public static String toTimeString(int minutes) {
-        return ""; // stub: filled in Step 3
+        return String.format("%02d:%02d", minutes / 60, minutes % 60);
     }
 
     public static String today() {
-        return ""; // stub: filled in Step 3
+        return LocalDate.now().toString();
     }
 
     public static int nowMinutes() {
-        return 0; // stub: filled in Step 3
+        return LocalTime.now().getHour() * 60 + LocalTime.now().getMinute();
     }
 
     public static double round2(double x) {
-        return x; // stub: filled in Step 3
+        return Math.round(x * 100) / 100.0;
     }
 
     public static int calculateAge(String birthdate) {
-        return 0; // stub: filled in Step 3
+        String[] born = birthdate.split("-");
+        String[] now = today().split("-");
+        int age = Integer.parseInt(now[0]) - Integer.parseInt(born[0]);
+        int monthBorn = Integer.parseInt(born[1]);
+        int dayBorn = Integer.parseInt(born[2]);
+        int monthNow = Integer.parseInt(now[1]);
+        int dayNow = Integer.parseInt(now[2]);
+
+        if (monthNow < monthBorn || (monthNow == monthBorn && dayNow < dayBorn)) {
+            age--;
+        }
+        return age;
+    }
+
+    // a showing is upcoming if its date is after today, or today and it starts later than now
+    private static boolean isUpcoming(Schedule s) {
+        boolean upcoming = false;
+
+        if (s.getDate().compareTo(today()) > 0) {
+            upcoming = true;
+        } else if (s.getDate().equals(today()) && toMinutes(s.getStartTime()) > nowMinutes()) {
+            upcoming = true;
+        }
+        return upcoming;
+    }
+
+    private static String bookingRef(int id) {
+        return "BK-" + String.format("%06d", id);
     }
 
     public static void checkOverlap(int userId, Schedule s) throws TimeOverlapException {
