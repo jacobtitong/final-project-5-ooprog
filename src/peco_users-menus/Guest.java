@@ -8,11 +8,12 @@ public class Guest extends User {
     @Override
     public User displayDashboard() {
         User nextUser = this;
+        User loggedIn = null;
         boolean endMenu = false;
         while (!endMenu) {
             System.out.print("\n=== GUEST MENU ===");
-            System.out.print("\n1 - Browse movies\n2 - View schedules\n3 - View movie synopsis\n4 - Search showtimes\n5 - Sign up\n6 - Exit\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 6);
+            System.out.print("\n1 - Browse movies\n2 - View schedules\n3 - View movie synopsis\n4 - Search showtimes\n5 - Log in\n6 - Sign up\n7 - Exit\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 7);
 
             switch (option) {
                 case 1:
@@ -28,14 +29,21 @@ public class Guest extends User {
                     searchShowtimes();
                     break;
                 case 5:
-                    signUp();
+                    loggedIn = login();
+                    if (loggedIn != null) {
+                        nextUser = loggedIn;
+                        endMenu = true;
+                    }
                     break;
                 case 6:
+                    signUp();
+                    break;
+                case 7:
                     nextUser = null;
                     endMenu = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-6.");
+                    System.out.println("Error: Invalid option. Please choose 1-7.");
             }
         }
 
@@ -313,5 +321,31 @@ public class Guest extends User {
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
         }
+    }
+
+    // ----- login -----
+
+    private static User login() {
+        DataStore ds = DataStore.getInstance();
+        User found = null;
+
+        try {
+            System.out.println("\n--- LOG IN ---");
+            String email = InputHelper.getOptional("Email: ");
+            String password = InputHelper.getOptional("Password: ");
+
+            User u = ds.findUserByEmail(email);
+            if (u == null || !u.getPassword().equals(password)) {
+                throw new AuthenticationException("Invalid email or password.");
+            }
+            if (!u.isActive()) {
+                throw new AuthenticationException("This account has been deactivated.");
+            }
+            System.out.println("Welcome, " + u.getName() + "!");
+            found = u;
+        } catch (AuthenticationException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+        return found;
     }
 }
