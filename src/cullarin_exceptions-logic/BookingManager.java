@@ -825,8 +825,40 @@ public class BookingManager {
         }
     }
 
+    // ----- review -----
+
     public static void submitReview(RegisteredUser u) {
-        // stub: filled in Step 8
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            printMovieList();
+            int movieId = InputHelper.getValidInt("Movie ID to review: ", 1, 999999);
+            if (ds.findMovieById(movieId) == null) {
+                throw new InvalidInputException("Movie ID not found.");
+            }
+            int rating = InputHelper.getValidInt("Rating (1-5): ", 1, 5);
+            String comment = InputHelper.getValidText("Comment (up to 100 characters, press Enter to skip): ", 0, 100);
+            String timestamp = LocalDateTime.now().toString();
+
+            Review existing = null;
+            for (Review r : ds.getReviews()) {
+                if (r.getUserId() == u.getId() && r.getMovieId() == movieId) {
+                    existing = r;
+                }
+            }
+            if (existing == null) {
+                ds.getReviews().add(new Review(ds.generateId(), u.getId(), movieId, rating, comment, timestamp));
+                System.out.println("Thank you! Your review was saved.");
+            } else {
+                existing.setRating(rating);
+                existing.setComment(comment);
+                existing.setTimestamp(timestamp);
+                System.out.println("Your earlier review for this movie was replaced.");
+            }
+            ds.saveReviews();
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     public static void processRefund(CustomerService cs) {
