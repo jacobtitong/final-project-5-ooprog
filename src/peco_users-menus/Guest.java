@@ -11,8 +11,8 @@ public class Guest extends User {
         boolean endMenu = false;
         while (!endMenu) {
             System.out.print("\n=== GUEST MENU ===");
-            System.out.print("\n1 - Browse movies\n2 - View schedules\n3 - View movie synopsis\n4 - Search showtimes\n5 - Exit\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 5);
+            System.out.print("\n1 - Browse movies\n2 - View schedules\n3 - View movie synopsis\n4 - Search showtimes\n5 - Sign up\n6 - Exit\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 6);
 
             switch (option) {
                 case 1:
@@ -28,11 +28,14 @@ public class Guest extends User {
                     searchShowtimes();
                     break;
                 case 5:
+                    signUp();
+                    break;
+                case 6:
                     nextUser = null;
                     endMenu = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-5.");
+                    System.out.println("Error: Invalid option. Please choose 1-6.");
             }
         }
 
@@ -277,5 +280,38 @@ public class Guest extends User {
             text = "(none yet)";
         }
         System.out.println(label + ": " + text);
+    }
+
+    // ----- sign up -----
+
+    private static void signUp() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            System.out.println("\n--- SIGN UP ---");
+            String name = InputHelper.getValidName("Name (2-30 letters, digits, spaces): ", 2, 30);
+            String email = InputHelper.getValidEmail("Email: ");
+            if (ds.findUserByEmail(email) != null) {
+                throw new InvalidInputException("That email is already registered.");
+            }
+            String password = InputHelper.getValidPassword("Password (8-20 chars, at least one letter and one digit): ");
+            String birthdate = InputHelper.getValidBirthdate("Birthdate (YYYY-MM-DD): ");
+
+            String paymentType = "none";
+            String paymentNumber = "none";
+            if (InputHelper.getYesNo("Save a payment method? (Y/N): ")) {
+                paymentType = InputHelper.getPaymentType();
+                paymentNumber = InputHelper.getValidPaymentNumber("Account number: ", paymentType);
+            }
+
+            int id = ds.generateId();
+            RegisteredUser user = new RegisteredUser(id, name, email, password, true, birthdate, paymentType, paymentNumber);
+            ds.getUsers().add(user);
+            ds.saveUsers();
+            ds.createUserBookingsFile(id);
+            System.out.println("Account created. You can now log in.");
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 }
