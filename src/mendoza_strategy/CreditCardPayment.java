@@ -1,7 +1,11 @@
-// Step 0 stub: signatures only, filled in at Step 2
 public class CreditCardPayment implements PaymentStrategy {
     @Override
     public void pay(double amount, String accountNumber) throws PaymentFailedException {
-        // stub: accepts every payment until Step 2
+        if (amount <= 0) {
+            throw new PaymentFailedException("Amount must be greater than 0.");
+        }
+        if (!accountNumber.matches("[0-9]{16}")) {
+            throw new PaymentFailedException("Card number must be exactly 16 digits.");
+        }
     }
 }
