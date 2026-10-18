@@ -934,8 +934,10 @@ public class BookingManager {
         }
     }
 
+    // ----- counter booking -----
+
     public static void bookAtCounter(Cashier c) {
-        // stub: filled in Step 10
+        bookTickets(true, null);
     }
 
     public static void createBulkRequest(CustomerService cs) {
