@@ -8,8 +8,8 @@ public class Admin extends User {
         boolean loggedOut = false;
         while (!loggedOut) {
             System.out.print("\n=== ADMIN MENU ===");
-            System.out.print("\n1 - Manage movies\n2 - Manage halls\n3 - Manage schedules\n4 - Manage discounts and promos\n5 - Logout\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 5);
+            System.out.print("\n1 - Manage movies\n2 - Manage halls\n3 - Manage schedules\n4 - Manage discounts and promos\n5 - Review bulk requests\n6 - Manage user accounts\n7 - Revenue report\n8 - System configuration\n9 - Logout\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 9);
 
             switch (option) {
                 case 1:
@@ -25,10 +25,22 @@ public class Admin extends User {
                     manageDiscounts();
                     break;
                 case 5:
+                    BookingManager.reviewBulkRequests(this);
+                    break;
+                case 6:
+                    manageUsers();
+                    break;
+                case 7:
+                    ReportManager.printRevenueReport();
+                    break;
+                case 8:
+                    manageConfig();
+                    break;
+                case 9:
                     loggedOut = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-5.");
+                    System.out.println("Error: Invalid option. Please choose 1-9.");
             }
         }
 
@@ -656,5 +668,116 @@ public class Admin extends User {
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
         }
+    }
+
+    // ----- user accounts (Step 13) -----
+
+    private void manageUsers() {
+        boolean back = false;
+        while (!back) {
+            System.out.print("\n=== MANAGE USER ACCOUNTS ===");
+            System.out.print("\n1 - List registered users\n2 - Deactivate a user\n3 - Back\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 3);
+
+            switch (option) {
+                case 1:
+                    listUsers();
+                    break;
+                case 2:
+                    deactivateUser();
+                    break;
+                case 3:
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Error: Invalid option. Please choose 1-3.");
+            }
+        }
+    }
+
+    private void listUsers() {
+        DataStore ds = DataStore.getInstance();
+        int count = 0;
+
+        System.out.println("-----------------------------------------------------------------------");
+        System.out.printf("%-4s | %-18s | %-26s | %-10s | %-8s%n", "ID", "Name", "Email", "Birthdate", "Status");
+        System.out.println("-----------------------------------------------------------------------");
+        for (User u : ds.getUsers()) {
+            if (u instanceof RegisteredUser) {
+                RegisteredUser r = (RegisteredUser) u;
+                String status = r.isActive() ? "Active" : "Inactive";
+                System.out.printf("%-4d | %-18.18s | %-26.26s | %-10s | %-8s%n",
+                        r.getId(), r.getName(), r.getEmail(), r.getBirthdate(), status);
+                count++;
+            }
+        }
+        if (count == 0) {
+            System.out.println("No registered users yet.");
+        }
+    }
+
+    private void deactivateUser() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            listUsers();
+            int id = InputHelper.getValidInt("User ID to deactivate: ", 1, 999999);
+            User found = null;
+            for (User u : ds.getUsers()) {
+                if (u instanceof RegisteredUser && u.getId() == id) {
+                    found = u;
+                }
+            }
+            if (found == null) {
+                throw new InvalidInputException("Registered user ID not found.");
+            }
+            if (!found.isActive()) {
+                throw new InvalidInputException("That account is already deactivated.");
+            }
+            if (InputHelper.getYesNo("Deactivate " + found.getName() + "? Their bookings stay. (Y/N): ")) {
+                found.setActive(false);
+                ds.saveUsers();
+                System.out.println("Account deactivated.");
+            }
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // ----- system configuration (Step 13) -----
+
+    private void manageConfig() {
+        boolean back = false;
+        while (!back) {
+            System.out.print("\n=== SYSTEM CONFIGURATION ===");
+            System.out.print("\n1 - Ticket limit per transaction (6-10)\n2 - Grace period before showtime in minutes (0-60)\n3 - Grace period after showtime in minutes (0-120)\n4 - Back\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 4);
+
+            switch (option) {
+                case 1:
+                    changeConfig("TICKET_LIMIT_PER_TRANSACTION", "Ticket limit per transaction", 6, 10);
+                    break;
+                case 2:
+                    changeConfig("GRACE_PERIOD_BEFORE_MINUTES", "Grace period before", 0, 60);
+                    break;
+                case 3:
+                    changeConfig("GRACE_PERIOD_AFTER_MINUTES", "Grace period after", 0, 120);
+                    break;
+                case 4:
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Error: Invalid option. Please choose 1-4.");
+            }
+        }
+    }
+
+    private void changeConfig(String key, String label, int min, int max) {
+        DataStore ds = DataStore.getInstance();
+
+        System.out.println(label + " is currently " + ds.getConfigInt(key) + ".");
+        int value = InputHelper.getValidInt("New value (" + min + "-" + max + "): ", min, max);
+        ds.setConfig(key, String.valueOf(value));
+        System.out.println(label + " updated.");
     }
 }
