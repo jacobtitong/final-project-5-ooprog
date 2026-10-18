@@ -648,16 +648,181 @@ public class BookingManager {
         return result;
     }
 
+    // ----- ticket, cancel, history -----
+
     public static void printTicket(Booking b) {
-        // stub: filled in Step 7
+        DataStore ds = DataStore.getInstance();
+        Schedule s = ds.findScheduleById(b.getScheduleId());
+        Movie movie = null;
+        Hall hall = null;
+        if (s != null) {
+            movie = ds.findMovieById(s.getMovieId());
+            hall = ds.findHallById(s.getHallId());
+        }
+        Transaction t = findTransaction(b.getId());
+
+        String title = "Unknown";
+        String place = "Unknown";
+        String when = "Unknown";
+        if (movie != null) {
+            title = movie.getTitle() + " (" + s.getFormat() + ")";
+        }
+        if (hall != null) {
+            place = hall.getCinemaLocation() + " / " + hall.getHallName();
+        }
+        if (s != null) {
+            when = s.getDate() + " " + s.getStartTime();
+        }
+
+        String border = "+----------------------------------------------------+";
+        System.out.println("\n" + border);
+        printBoxLine("E-TICKET / RECEIPT");
+        System.out.println(border);
+        printBoxLine("Ref: " + bookingRef(b.getId()));
+        printBoxLine("Movie: " + title);
+        printBoxLine("Cinema / Hall: " + place);
+        printBoxLine("Date / Time: " + when);
+        printBoxLine("Seats: " + b.getSeats());
+
+        boolean hasSnacks = false;
+        for (SnackOrder o : ds.getSnackOrders()) {
+            if (o.getBookingId() == b.getId()) {
+                Snack snack = ds.findSnackById(o.getSnackId());
+                String snackName = "Snack " + o.getSnackId();
+                if (snack != null) {
+                    snackName = snack.getName();
+                }
+                printBoxLine(String.format("Snack: %s x%d = Php %.2f", snackName, o.getQuantity(), o.getQuantity() * o.getUnitPrice()));
+                hasSnacks = true;
+            }
+        }
+        if (!hasSnacks) {
+            printBoxLine("Snacks: none");
+        }
+
+        // the discount is worked out from the saved amounts (a booking has no discount field)
+        String discountText = "None";
+        if (t != null && s != null) {
+            double off = round2(t.getTicketCount() * s.getTicketPrice() - t.getTicketAmount());
+            if (off > 0) {
+                discountText = String.format("-Php %.2f on tickets", off);
+            }
+        }
+        printBoxLine("Discount applied: " + discountText);
+        printBoxLine(String.format("Total paid: Php %.2f", b.getTotalPaid()));
+        if (t != null) {
+            printBoxLine("Payment method: " + t.getMethod());
+        }
+        printBoxLine("Customer: " + b.getCustomerName());
+        if (b.getStatus().equals("CANCELLED")) {
+            printBoxLine("Status: CANCELLED");
+        }
+        System.out.println(border);
+    }
+
+    private static void printBoxLine(String text) {
+        System.out.printf("| %-50.50s |%n", text);
+    }
+
+    private static Transaction findTransaction(int bookingId) {
+        DataStore ds = DataStore.getInstance();
+
+        for (Transaction t : ds.getTransactions()) {
+            if (t.getBookingId() == bookingId) {
+                return t;
+            }
+        }
+        return null;
     }
 
     public static void cancelBooking(RegisteredUser u) {
-        // stub: filled in Step 7
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            String path = ds.getUserBookingsPath(u.getId());
+            ArrayList<Booking> bookings = ds.loadBookings(path);
+            ArrayList<Booking> eligible = new ArrayList<>();
+            for (Booking b : bookings) {
+                Schedule s = ds.findScheduleById(b.getScheduleId());
+                if (b.getStatus().equals("CONFIRMED") && s != null && isUpcoming(s)) {
+                    eligible.add(b);
+                }
+            }
+            if (eligible.size() == 0) {
+                throw new InvalidInputException("You have no bookings that can be cancelled.");
+            }
+
+            System.out.println("\nBookings you can cancel:");
+            printBookingTable(eligible);
+            int bookingId = InputHelper.getValidInt("Booking number to cancel (the number in BK-000012 is 12): ", 1, 999999);
+            Booking chosen = null;
+            for (Booking b : eligible) {
+                if (b.getId() == bookingId) {
+                    chosen = b;
+                }
+            }
+            if (chosen == null) {
+                throw new InvalidInputException("That booking is not eligible to cancel.");
+            }
+
+            if (InputHelper.getYesNo("Cancel booking " + bookingRef(chosen.getId()) + "? (Y/N): ")) {
+                chosen.setStatus("CANCELLED");
+                ds.saveBookings(path, bookings);
+
+                for (int i = ds.getLedger().size() - 1; i >= 0; i--) {
+                    if (ds.getLedger().get(i).getBookingId() == chosen.getId()) {
+                        ds.getLedger().remove(i);
+                    }
+                }
+                ds.saveLedger();
+
+                Transaction t = findTransaction(chosen.getId());
+                if (t != null) {
+                    t.setStatus("REFUND_PENDING");
+                    ds.saveTransactions();
+                }
+                System.out.println("Booking cancelled. Your refund is now waiting for Customer Service.");
+            }
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     public static void showBookingHistory(RegisteredUser u) {
-        // stub: filled in Step 7
+        DataStore ds = DataStore.getInstance();
+
+        System.out.println("\n--- BOOKING HISTORY: " + u.getName() + " ---");
+        printBookingTable(ds.loadBookings(ds.getUserBookingsPath(u.getId())));
+    }
+
+    private static void printBookingTable(ArrayList<Booking> list) {
+        DataStore ds = DataStore.getInstance();
+
+        if (list.size() == 0) {
+            System.out.println("No bookings to show.");
+        } else {
+            String line = "------------------------------------------------------------------------------------------";
+            System.out.println(line);
+            System.out.printf("%-10s | %-16s | %-10s | %-5s | %-14s | %-10s | %-12s%n",
+                    "Ref", "Movie", "Date", "Time", "Seats", "Status", "Total");
+            System.out.println(line);
+            for (Booking b : list) {
+                Schedule s = ds.findScheduleById(b.getScheduleId());
+                String title = "Unknown";
+                String date = "-";
+                String time = "-";
+                if (s != null) {
+                    Movie m = ds.findMovieById(s.getMovieId());
+                    if (m != null) {
+                        title = m.getTitle();
+                    }
+                    date = s.getDate();
+                    time = s.getStartTime();
+                }
+                System.out.printf("%-10s | %-16.16s | %-10s | %-5s | %-14.14s | %-10.10s | Php %-8.2f%n",
+                        bookingRef(b.getId()), title, date, time, b.getSeats(), b.getStatus(), b.getTotalPaid());
+            }
+        }
     }
 
     public static void submitReview(RegisteredUser u) {
