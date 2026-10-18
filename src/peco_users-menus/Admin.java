@@ -8,8 +8,8 @@ public class Admin extends User {
         boolean loggedOut = false;
         while (!loggedOut) {
             System.out.print("\n=== ADMIN MENU ===");
-            System.out.print("\n1 - Manage movies\n2 - Manage halls\n3 - Logout\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 3);
+            System.out.print("\n1 - Manage movies\n2 - Manage halls\n3 - Manage schedules\n4 - Manage discounts and promos\n5 - Logout\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 5);
 
             switch (option) {
                 case 1:
@@ -19,10 +19,16 @@ public class Admin extends User {
                     manageHalls();
                     break;
                 case 3:
+                    manageSchedules();
+                    break;
+                case 4:
+                    manageDiscounts();
+                    break;
+                case 5:
                     loggedOut = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-3.");
+                    System.out.println("Error: Invalid option. Please choose 1-5.");
             }
         }
 
@@ -297,6 +303,355 @@ public class Admin extends User {
                 ds.getHalls().remove(h);
                 ds.saveHalls();
                 System.out.println("Hall removed.");
+            }
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // ----- schedules (Step 12) -----
+
+    private void manageSchedules() {
+        boolean back = false;
+        while (!back) {
+            System.out.print("\n=== MANAGE SCHEDULES ===");
+            System.out.print("\n1 - Add a schedule\n2 - List schedules\n3 - Edit a schedule\n4 - Remove a schedule\n5 - Back\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 5);
+
+            switch (option) {
+                case 1:
+                    addSchedule();
+                    break;
+                case 2:
+                    Guest.printSchedules(DataStore.getInstance().getSchedules(), false);
+                    break;
+                case 3:
+                    editSchedule();
+                    break;
+                case 4:
+                    removeSchedule();
+                    break;
+                case 5:
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Error: Invalid option. Please choose 1-5.");
+            }
+        }
+    }
+
+    private Schedule chooseSchedule() throws InvalidInputException {
+        DataStore ds = DataStore.getInstance();
+
+        int id = InputHelper.getValidInt("Schedule ID: ", 1, 999999);
+        Schedule s = ds.findScheduleById(id);
+        if (s == null) {
+            throw new InvalidInputException("Schedule ID not found.");
+        }
+        return s;
+    }
+
+    private String chooseFormat() {
+        String[] formats = {"2D", "3D", "IMAX", "4DX"};
+
+        System.out.print("\n1 - 2D\n2 - 3D\n3 - IMAX\n4 - 4DX\n");
+        int choice = InputHelper.getValidInt("--> Format: ", 1, 4);
+        return formats[choice - 1];
+    }
+
+    private void addSchedule() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            Guest.viewMovies();
+            Movie m = chooseMovie();
+            listHalls();
+            Hall h = chooseHall();
+            String date = InputHelper.getValidDate("Date (YYYY-MM-DD): ");
+            String startTime = InputHelper.getValidTime("Start time (HH:MM, 24-hour): ");
+            String format = chooseFormat();
+            double price = InputHelper.getValidDouble("Ticket price (50.00-1000.00): ", 50, 1000);
+
+            Schedule test = new Schedule(0, m.getId(), h.getId(), date, startTime, format, price);
+            BookingManager.checkScheduleConflict(test, 0);
+
+            ds.getSchedules().add(new Schedule(ds.generateId(), m.getId(), h.getId(), date, startTime, format, price));
+            ds.saveSchedules();
+            System.out.println("Schedule added.");
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private void editSchedule() {
+        try {
+            Schedule s = chooseSchedule();
+            boolean done = false;
+
+            while (!done) {
+                System.out.print("\n=== EDIT SCHEDULE ===");
+                System.out.print("\n1 - Movie\n2 - Hall\n3 - Date\n4 - Start time\n5 - Format\n6 - Ticket price\n7 - Done\n");
+                int field = InputHelper.getValidInt("--> Option: ", 1, 7);
+
+                if (field == 7) {
+                    done = true;
+                } else {
+                    try {
+                        changeSchedule(s, field);
+                    } catch (CbsException e) {
+                        System.out.println("Error: " + e.getMessage());
+                    }
+                }
+            }
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // the change is only saved when it does not overlap another schedule in the same hall
+    private void changeSchedule(Schedule s, int field) throws CbsException {
+        DataStore ds = DataStore.getInstance();
+        int movieId = s.getMovieId();
+        int hallId = s.getHallId();
+        String date = s.getDate();
+        String startTime = s.getStartTime();
+        String format = s.getFormat();
+        double price = s.getTicketPrice();
+
+        if (field == 1) {
+            Guest.viewMovies();
+            movieId = chooseMovie().getId();
+        } else if (field == 2) {
+            listHalls();
+            hallId = chooseHall().getId();
+        } else if (field == 3) {
+            date = InputHelper.getValidDate("New date (YYYY-MM-DD): ");
+        } else if (field == 4) {
+            startTime = InputHelper.getValidTime("New start time (HH:MM): ");
+        } else if (field == 5) {
+            format = chooseFormat();
+        } else {
+            price = InputHelper.getValidDouble("New ticket price (50.00-1000.00): ", 50, 1000);
+        }
+
+        Schedule test = new Schedule(s.getId(), movieId, hallId, date, startTime, format, price);
+        BookingManager.checkScheduleConflict(test, s.getId());
+
+        s.setMovieId(movieId);
+        s.setHallId(hallId);
+        s.setDate(date);
+        s.setStartTime(startTime);
+        s.setFormat(format);
+        s.setTicketPrice(price);
+        ds.saveSchedules();
+        System.out.println("Schedule updated.");
+    }
+
+    private void removeSchedule() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            Schedule s = chooseSchedule();
+            // a seat row in the ledger means a confirmed booking exists for this schedule
+            for (SeatLedgerEntry entry : ds.getLedger()) {
+                if (entry.getScheduleId() == s.getId()) {
+                    throw new InvalidInputException("Cannot remove: this schedule has confirmed bookings.");
+                }
+            }
+            if (InputHelper.getYesNo("Remove schedule " + s.getId() + "? (Y/N): ")) {
+                ds.getSchedules().remove(s);
+                ds.saveSchedules();
+                System.out.println("Schedule removed.");
+            }
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // ----- discounts and promos (Step 12) -----
+
+    private void manageDiscounts() {
+        boolean back = false;
+        while (!back) {
+            System.out.print("\n=== MANAGE PROMOS ===");
+            System.out.print("\n1 - Create a promo\n2 - List promos\n3 - Edit a promo\n4 - Extend a promo\n5 - Deactivate a promo\n6 - Back\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 6);
+
+            switch (option) {
+                case 1:
+                    createDiscount();
+                    break;
+                case 2:
+                    listDiscounts();
+                    break;
+                case 3:
+                    editDiscount();
+                    break;
+                case 4:
+                    extendDiscount();
+                    break;
+                case 5:
+                    deactivateDiscount();
+                    break;
+                case 6:
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Error: Invalid option. Please choose 1-6.");
+            }
+        }
+    }
+
+    private Discount findDiscount(String code) {
+        DataStore ds = DataStore.getInstance();
+
+        for (Discount d : ds.getDiscounts()) {
+            if (d.getCode().equalsIgnoreCase(code)) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    private Discount chooseDiscount() throws InvalidInputException {
+        listDiscounts();
+        String code = InputHelper.getValidCode("Promo code: ");
+        Discount d = findDiscount(code);
+        if (d == null) {
+            throw new InvalidInputException("Promo code not found.");
+        }
+        return d;
+    }
+
+    private void listDiscounts() {
+        DataStore ds = DataStore.getInstance();
+
+        if (ds.getDiscounts().size() == 0) {
+            System.out.println("No promos yet.");
+        } else {
+            System.out.println("-----------------------------------------------------------------------");
+            System.out.printf("%-12s | %-8s | %-10s | %-9s | %-10s | %-8s%n", "Code", "Type", "Value", "Stackable", "Expiry", "Status");
+            System.out.println("-----------------------------------------------------------------------");
+            for (Discount d : ds.getDiscounts()) {
+                String stackable = d.isStackable() ? "Yes" : "No";
+                String status = d.isActive() ? "Active" : "Inactive";
+                System.out.printf("%-12s | %-8s | %-10.2f | %-9s | %-10s | %-8s%n",
+                        d.getCode(), d.getType(), d.getValue(), stackable, d.getExpiryDate(), status);
+            }
+        }
+    }
+
+    private String getValidFutureDate(String prompt) {
+        String date = "";
+        boolean isValid = false;
+
+        while (!isValid) {
+            date = InputHelper.getValidDate(prompt);
+            if (date.compareTo(BookingManager.today()) < 0) {
+                System.out.println("Error: The date cannot be in the past.");
+            } else {
+                isValid = true;
+            }
+        }
+        return date;
+    }
+
+    private void createDiscount() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            String code = InputHelper.getValidCode("Promo code (4-12 letters or digits): ");
+            if (findDiscount(code) != null) {
+                throw new InvalidInputException("That promo code already exists.");
+            }
+            System.out.print("\n1 - PERCENT (1-50)\n2 - FIXED (Php 1.00-500.00)\n");
+            int choice = InputHelper.getValidInt("--> Discount type: ", 1, 2);
+            String type = "PERCENT";
+            double value;
+            if (choice == 1) {
+                value = InputHelper.getValidDouble("Percent off (1-50): ", 1, 50);
+            } else {
+                type = "FIXED";
+                value = InputHelper.getValidDouble("Amount off in Php (1.00-500.00): ", 1, 500);
+            }
+            boolean stackable = InputHelper.getYesNo("Can it be used together with Senior/PWD/Student discounts? (Y/N): ");
+            String expiry = getValidFutureDate("Expiry date (YYYY-MM-DD): ");
+
+            ds.getDiscounts().add(new Discount(code, type, value, stackable, expiry, true));
+            ds.saveDiscounts();
+            System.out.println("Promo created.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private void editDiscount() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            Discount d = chooseDiscount();
+            boolean done = false;
+
+            while (!done) {
+                System.out.print("\n=== EDIT PROMO " + d.getCode() + " ===");
+                System.out.print("\n1 - Change type and value\n2 - Change stackable\n3 - Done\n");
+                int option = InputHelper.getValidInt("--> Option: ", 1, 3);
+
+                if (option == 1) {
+                    System.out.print("\n1 - PERCENT (1-50)\n2 - FIXED (Php 1.00-500.00)\n");
+                    int choice = InputHelper.getValidInt("--> Discount type: ", 1, 2);
+                    if (choice == 1) {
+                        d.setType("PERCENT");
+                        d.setValue(InputHelper.getValidDouble("Percent off (1-50): ", 1, 50));
+                    } else {
+                        d.setType("FIXED");
+                        d.setValue(InputHelper.getValidDouble("Amount off in Php (1.00-500.00): ", 1, 500));
+                    }
+                    ds.saveDiscounts();
+                    System.out.println("Promo updated.");
+                } else if (option == 2) {
+                    d.setStackable(InputHelper.getYesNo("Can it be used together with Senior/PWD/Student discounts? (Y/N): "));
+                    ds.saveDiscounts();
+                    System.out.println("Promo updated.");
+                } else {
+                    done = true;
+                }
+            }
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private void extendDiscount() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            Discount d = chooseDiscount();
+            System.out.println("Current expiry date: " + d.getExpiryDate());
+            String newDate = getValidFutureDate("New expiry date (YYYY-MM-DD): ");
+            if (newDate.compareTo(d.getExpiryDate()) <= 0) {
+                throw new InvalidInputException("The new date must be after the current expiry date.");
+            }
+            d.setExpiryDate(newDate);
+            ds.saveDiscounts();
+            System.out.println("Promo extended.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private void deactivateDiscount() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            Discount d = chooseDiscount();
+            if (!d.isActive()) {
+                throw new InvalidInputException("That promo is already inactive.");
+            }
+            if (InputHelper.getYesNo("Deactivate " + d.getCode() + "? (Y/N): ")) {
+                d.setActive(false);
+                ds.saveDiscounts();
+                System.out.println("Promo deactivated.");
             }
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
