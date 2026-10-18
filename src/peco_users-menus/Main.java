@@ -1,6 +1,13 @@
-// Step 0 stub: signatures only, filled in at Step 6
 public class Main {
     public static void main(String[] args) {
-        // stub: filled in Step 6
+        DataStore.getInstance();
+        System.out.println("=== CINEMA BOOKING SYSTEM ===");
+
+        User currentUser = new Guest();
+        while (currentUser != null) {
+            currentUser = currentUser.displayDashboard();
+        }
+
+        System.out.println("\nThank you for using the Cinema Booking System. Goodbye!");
     }
 }
