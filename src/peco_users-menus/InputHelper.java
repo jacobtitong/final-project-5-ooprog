@@ -1,7 +1,29 @@
-// Step 0 stub: signatures only, filled in at Step 1-2
+import java.util.Scanner;
+
 public class InputHelper {
+    static Scanner sc = new Scanner(System.in);
+
     public static int getValidInt(String prompt, int min, int max) {
-        return 0; // stub: filled in Step 1
+        int number = 0;
+        boolean isValid = false;
+
+        while (!isValid) {
+            System.out.print(prompt);
+            String input = sc.nextLine();
+
+            try {
+                number = Integer.parseInt(input.trim());
+                if (number < min || number > max) {
+                    throw new InvalidInputException("Value must be between " + min + " and " + max + ".");
+                }
+                isValid = true;
+            } catch (NumberFormatException e) {
+                System.out.println("Error: Please enter a valid number, not text.");
+            } catch (InvalidInputException e) {
+                System.out.println("Error: " + e.getMessage());
+            }
+        }
+        return number;
     }
 
     public static double getValidDouble(String prompt, double min, double max) {
