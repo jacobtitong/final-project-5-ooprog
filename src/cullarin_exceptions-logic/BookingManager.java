@@ -940,11 +940,145 @@ public class BookingManager {
         bookTickets(true, null);
     }
 
+    // ----- bulk requests -----
+
     public static void createBulkRequest(CustomerService cs) {
-        // stub: filled in Step 11
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            String requester = InputHelper.getValidName("Requester name (2-30 letters, digits, spaces): ", 2, 30);
+
+            System.out.print("\n1 - Email\n2 - Mobile number\n");
+            int contactType = InputHelper.getValidInt("--> Contact type: ", 1, 2);
+            String contact;
+            if (contactType == 1) {
+                contact = InputHelper.getValidEmail("Contact email: ");
+            } else {
+                contact = InputHelper.getValidName("Mobile number (11 digits): ", 11, 11);
+                if (!contact.matches("[0-9]{11}")) {
+                    throw new InvalidInputException("Mobile number must be exactly 11 digits.");
+                }
+            }
+
+            ArrayList<Schedule> upcoming = new ArrayList<>();
+            for (Schedule s : ds.getSchedules()) {
+                if (isUpcoming(s)) {
+                    upcoming.add(s);
+                }
+            }
+            if (upcoming.size() == 0) {
+                throw new InvalidInputException("There are no upcoming showings.");
+            }
+            printScheduleList(upcoming);
+            int scheduleId = InputHelper.getValidInt("Schedule ID: ", 1, 999999);
+            Schedule schedule = null;
+            for (Schedule s : upcoming) {
+                if (s.getId() == scheduleId) {
+                    schedule = s;
+                }
+            }
+            if (schedule == null) {
+                throw new InvalidInputException("Choose a schedule ID from the list.");
+            }
+            int seatCount = InputHelper.getValidInt("Number of seats (20-200): ", 20, 200);
+
+            ds.getBulkRequests().add(new BulkBookingRequest(ds.generateId(), requester, contact, scheduleId, seatCount, "PENDING", 0));
+            ds.saveBulkRequests();
+            System.out.println("Bulk request saved as PENDING. An Admin will review it.");
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     public static void reviewBulkRequests(Admin a) {
-        // stub: filled in Step 11
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            ArrayList<BulkBookingRequest> pending = new ArrayList<>();
+            for (BulkBookingRequest r : ds.getBulkRequests()) {
+                if (r.getStatus().equals("PENDING")) {
+                    pending.add(r);
+                }
+            }
+            if (pending.size() == 0) {
+                throw new InvalidInputException("There are no pending bulk requests.");
+            }
+
+            String line = "------------------------------------------------------------------------------";
+            System.out.println("\n" + line);
+            System.out.printf("%-4s | %-18s | %-26s | %-8s | %-5s%n", "ID", "Requester", "Contact", "Schedule", "Seats");
+            System.out.println(line);
+            for (BulkBookingRequest r : pending) {
+                System.out.printf("%-4d | %-18.18s | %-26.26s | %-8d | %-5d%n",
+                        r.getId(), r.getRequesterName(), r.getContactInfo(), r.getScheduleId(), r.getSeatCount());
+            }
+
+            int id = InputHelper.getValidInt("Request ID: ", 1, 999999);
+            BulkBookingRequest request = null;
+            for (BulkBookingRequest r : pending) {
+                if (r.getId() == id) {
+                    request = r;
+                }
+            }
+            if (request == null) {
+                throw new InvalidInputException("Choose a request ID from the list.");
+            }
+
+            System.out.print("\n1 - Approve\n2 - Reject\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 2);
+
+            if (option == 2) {
+                request.setStatus("REJECTED");
+                request.setReviewerId(a.getId());
+                ds.saveBulkRequests();
+                System.out.println("Request rejected.");
+            } else {
+                Schedule schedule = ds.findScheduleById(request.getScheduleId());
+                if (schedule == null) {
+                    throw new InvalidInputException("The schedule for this request no longer exists.");
+                }
+                ArrayList<String> seats = findFreeSeats(schedule, request.getSeatCount());
+                if (seats.size() < request.getSeatCount()) {
+                    throw new SeatUnavailableException("Only " + seats.size() + " seats are free, but " + request.getSeatCount()
+                            + " are needed. The request stays PENDING.");
+                }
+
+                double subtotal = round2(schedule.getTicketPrice() * seats.size());
+                DiscountStrategy discount = new BulkDiscount(request.getSeatCount());
+                double total = discount.apply(subtotal);
+                String timestamp = LocalDateTime.now().toString();
+                int bookingId = ds.generateId();
+
+                String seatsText = "";
+                for (int i = 0; i < seats.size(); i++) {
+                    if (i > 0) {
+                        seatsText += ",";
+                    }
+                    seatsText += seats.get(i);
+                    ds.getLedger().add(new SeatLedgerEntry(schedule.getId(), seats.get(i), bookingId));
+                }
+                ds.saveLedger();
+
+                Booking booking = new Booking(bookingId, "BULK", 0, request.getRequesterName(), schedule.getId(),
+                        seatsText, "CONFIRMED", total, timestamp);
+                String path = ds.getCounterBookingsPath();
+                ArrayList<Booking> bookings = ds.loadBookings(path);
+                bookings.add(booking);
+                ds.saveBookings(path, bookings);
+
+                ds.getTransactions().add(new Transaction(ds.generateId(), bookingId, "BULK", 0, schedule.getId(),
+                        seats.size(), total, 0.0, total, "CASH", "SUCCESS", 0.0, timestamp));
+                ds.saveTransactions();
+
+                request.setStatus("APPROVED");
+                request.setReviewerId(a.getId());
+                ds.saveBulkRequests();
+
+                System.out.println("Request approved. Booking " + bookingRef(bookingId) + " was created.");
+                printTicket(booking);
+            }
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 }
