@@ -1,4 +1,5 @@
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 
@@ -240,8 +241,411 @@ public class BookingManager {
         return seats;
     }
 
+    // ----- booking (online and counter share bookTickets) -----
+
     public static void bookOnline(RegisteredUser u) {
-        // stub: filled in Step 6
+        bookTickets(false, u);
+    }
+
+    private static void bookTickets(boolean counter, RegisteredUser user) {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            String ownerType = "GUEST";
+            int ownerId = 0;
+            String customerName = "Walk-in";
+            String path = ds.getCounterBookingsPath();
+            if (!counter) {
+                ownerType = "REGISTERED_USER";
+                ownerId = user.getId();
+                customerName = user.getName();
+                path = ds.getUserBookingsPath(user.getId());
+            }
+
+            // 1. movie and an upcoming schedule
+            printMovieList();
+            int movieId = InputHelper.getValidInt("Movie ID: ", 1, 999999);
+            Movie movie = ds.findMovieById(movieId);
+            if (movie == null) {
+                throw new InvalidInputException("Movie ID not found.");
+            }
+            ArrayList<Schedule> upcoming = upcomingSchedulesOf(movieId);
+            if (upcoming.size() == 0) {
+                throw new InvalidInputException("This movie has no upcoming showings.");
+            }
+            printScheduleList(upcoming);
+            int scheduleId = InputHelper.getValidInt("Schedule ID: ", 1, 999999);
+            Schedule schedule = null;
+            for (Schedule s : upcoming) {
+                if (s.getId() == scheduleId) {
+                    schedule = s;
+                }
+            }
+            if (schedule == null) {
+                throw new InvalidInputException("Choose a schedule ID from the list.");
+            }
+
+            // 2. overlap check (registered users only)
+            if (!counter) {
+                checkOverlap(user.getId(), schedule);
+            }
+
+            // 3. seats are only held in this list, nothing is written yet
+            ArrayList<String> seats = chooseSeats(schedule, ds.getConfigInt("TICKET_LIMIT_PER_TRANSACTION"));
+            double ticketSubtotal = round2(schedule.getTicketPrice() * seats.size());
+
+            // 4. snacks
+            ArrayList<Snack> pickedSnacks = new ArrayList<>();
+            ArrayList<Integer> pickedQuantities = new ArrayList<>();
+            pickSnacks(pickedSnacks, pickedQuantities);
+            double snackTotal = 0;
+            for (int i = 0; i < pickedSnacks.size(); i++) {
+                snackTotal += pickedSnacks.get(i).getPrice() * pickedQuantities.get(i);
+            }
+            snackTotal = round2(snackTotal);
+
+            // 5. discounts (tickets only, snacks stay full price)
+            String[] discountName = new String[1];
+            double discountedTickets = applyDiscounts(ticketSubtotal, counter, user, discountName);
+            double total = round2(discountedTickets + snackTotal);
+
+            // 6. summary and confirmation
+            String seatsText = "";
+            for (int i = 0; i < seats.size(); i++) {
+                if (i > 0) {
+                    seatsText += ",";
+                }
+                seatsText += seats.get(i);
+            }
+            Hall hall = ds.findHallById(schedule.getHallId());
+            String place = "Unknown";
+            if (hall != null) {
+                place = hall.getCinemaLocation() + " / " + hall.getHallName();
+            }
+            System.out.println("\n=== BOOKING SUMMARY ===");
+            System.out.println("Movie: " + movie.getTitle() + " (" + schedule.getFormat() + ")");
+            System.out.println("Showing: " + schedule.getDate() + " " + schedule.getStartTime() + " at " + place);
+            System.out.println("Seats: " + seatsText + " | Tickets: " + seats.size());
+            System.out.printf("Tickets: Php %.2f%n", ticketSubtotal);
+            System.out.printf("Discount (%s): -Php %.2f%n", discountName[0], round2(ticketSubtotal - discountedTickets));
+            for (int i = 0; i < pickedSnacks.size(); i++) {
+                System.out.printf("Snack: %s x%d = Php %.2f%n", pickedSnacks.get(i).getName(), pickedQuantities.get(i),
+                        pickedSnacks.get(i).getPrice() * pickedQuantities.get(i));
+            }
+            System.out.printf("Snacks: Php %.2f%n", snackTotal);
+            System.out.printf("TOTAL: Php %.2f%n", total);
+
+            if (!InputHelper.getYesNo("Confirm booking? (Y/N): ")) {
+                System.out.println("Booking cancelled. Nothing was saved.");
+            } else {
+                // 7. payment (retry or abort, nothing is written until it works)
+                String method = takePayment(total, counter, user);
+
+                if (!method.equals("")) {
+                    // 8. everything is saved only now
+                    String timestamp = LocalDateTime.now().toString();
+                    int bookingId = ds.generateId();
+
+                    for (String seat : seats) {
+                        ds.getLedger().add(new SeatLedgerEntry(schedule.getId(), seat, bookingId));
+                    }
+                    ds.saveLedger();
+
+                    Booking booking = new Booking(bookingId, ownerType, ownerId, customerName, schedule.getId(),
+                            seatsText, "CONFIRMED", total, timestamp);
+                    ArrayList<Booking> bookings = ds.loadBookings(path);
+                    bookings.add(booking);
+                    ds.saveBookings(path, bookings);
+
+                    ds.getTransactions().add(new Transaction(ds.generateId(), bookingId, ownerType, ownerId, schedule.getId(),
+                            seats.size(), discountedTickets, snackTotal, total, method, "SUCCESS", 0.0, timestamp));
+                    ds.saveTransactions();
+
+                    for (int i = 0; i < pickedSnacks.size(); i++) {
+                        Snack snack = pickedSnacks.get(i);
+                        snack.setStock(snack.getStock() - pickedQuantities.get(i));
+                        ds.getSnackOrders().add(new SnackOrder(ds.generateId(), bookingId, snack.getId(),
+                                pickedQuantities.get(i), snack.getPrice()));
+                    }
+                    ds.saveSnacks();
+                    ds.saveSnackOrders();
+
+                    System.out.println("\nPayment successful. Booking " + bookingRef(bookingId) + " is confirmed.");
+                    printTicket(booking);
+                }
+            }
+        } catch (CbsException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private static void printMovieList() {
+        DataStore ds = DataStore.getInstance();
+
+        System.out.println("\n-------------------------------------------------------------------------------");
+        System.out.printf("%-4s | %-20s | %-12s | %-10s | %-10s | %-10s%n", "ID", "Title", "Genre", "Language", "Rating", "Avg Review");
+        System.out.println("-------------------------------------------------------------------------------");
+        for (Movie m : ds.getMovies()) {
+            System.out.printf("%-4d | %-20.20s | %-12.12s | %-10.10s | %-10.10s | %-10s%n",
+                    m.getId(), m.getTitle(), m.getGenre(), m.getLanguage(), m.getAgeRating(), averageRating(m.getId()));
+        }
+    }
+
+    private static String averageRating(int movieId) {
+        DataStore ds = DataStore.getInstance();
+        int total = 0;
+        int count = 0;
+
+        for (Review r : ds.getReviews()) {
+            if (r.getMovieId() == movieId) {
+                total += r.getRating();
+                count++;
+            }
+        }
+        if (count == 0) {
+            return "N/A";
+        }
+        return String.format("%.1f", (double) total / count);
+    }
+
+    private static ArrayList<Schedule> upcomingSchedulesOf(int movieId) {
+        DataStore ds = DataStore.getInstance();
+        ArrayList<Schedule> list = new ArrayList<>();
+
+        for (Schedule s : ds.getSchedules()) {
+            if (s.getMovieId() == movieId && isUpcoming(s)) {
+                list.add(s);
+            }
+        }
+        return list;
+    }
+
+    private static void printScheduleList(ArrayList<Schedule> list) {
+        DataStore ds = DataStore.getInstance();
+        String line = "-----------------------------------------------------------------------------------------------";
+
+        System.out.println("\n" + line);
+        System.out.printf("%-4s | %-16s | %-12s | %-8s | %-10s | %-5s | %-6s | %-11s%n",
+                "ID", "Movie", "Cinema", "Hall", "Date", "Time", "Format", "Price");
+        System.out.println(line);
+        for (Schedule s : list) {
+            Movie m = ds.findMovieById(s.getMovieId());
+            Hall h = ds.findHallById(s.getHallId());
+            String title = "Unknown";
+            String cinema = "Unknown";
+            String hallName = "Unknown";
+            if (m != null) {
+                title = m.getTitle();
+            }
+            if (h != null) {
+                cinema = h.getCinemaLocation();
+                hallName = h.getHallName();
+            }
+            System.out.printf("%-4d | %-16.16s | %-12.12s | %-8.8s | %-10s | %-5s | %-6s | Php %-7.2f%n",
+                    s.getId(), title, cinema, hallName, s.getDate(), s.getStartTime(), s.getFormat(), s.getTicketPrice());
+        }
+    }
+
+    // snack id + quantity until the user types 0; only active snacks, stock is checked
+    private static void pickSnacks(ArrayList<Snack> picked, ArrayList<Integer> quantities) throws InvalidInputException, InsufficientStockException {
+        DataStore ds = DataStore.getInstance();
+        int available = 0;
+
+        System.out.println("\n--- SNACKS ---");
+        for (Snack s : ds.getSnacks()) {
+            if (s.isActive()) {
+                if (available == 0) {
+                    System.out.printf("%-4s | %-20s | %-12s | %-6s%n", "ID", "Name", "Price", "Stock");
+                }
+                System.out.printf("%-4d | %-20.20s | Php %-8.2f | %-6d%n", s.getId(), s.getName(), s.getPrice(), s.getStock());
+                available++;
+            }
+        }
+
+        if (available == 0) {
+            System.out.println("No snacks are available right now.");
+        } else {
+            boolean done = false;
+            while (!done) {
+                int id = InputHelper.getValidInt("Snack ID (0 to finish): ", 0, 999999);
+
+                if (id == 0) {
+                    done = true;
+                } else {
+                    Snack snack = ds.findSnackById(id);
+                    if (snack == null) {
+                        throw new InvalidInputException("Snack ID not found.");
+                    }
+                    if (!snack.isActive()) {
+                        throw new InvalidInputException("That snack is discontinued.");
+                    }
+                    int quantity = InputHelper.getValidInt("Quantity (1-10): ", 1, 10);
+
+                    int index = -1;
+                    for (int i = 0; i < picked.size(); i++) {
+                        if (picked.get(i).getId() == id) {
+                            index = i;
+                        }
+                    }
+                    int already = 0;
+                    if (index != -1) {
+                        already = quantities.get(index);
+                    }
+                    if (already + quantity > 10) {
+                        throw new InvalidInputException("You can order at most 10 of the same snack.");
+                    }
+                    if (already + quantity > snack.getStock()) {
+                        throw new InsufficientStockException("Only " + snack.getStock() + " " + snack.getName() + " left in stock.");
+                    }
+                    if (index == -1) {
+                        picked.add(snack);
+                        quantities.add(quantity);
+                    } else {
+                        quantities.set(index, already + quantity);
+                    }
+                }
+            }
+        }
+    }
+
+    // identity discount first, then the promo; returns the discounted ticket subtotal
+    private static double applyDiscounts(double ticketSubtotal, boolean counter, RegisteredUser user, String[] discountName) throws InvalidDiscountException {
+        DataStore ds = DataStore.getInstance();
+        DiscountStrategy identity = null;
+        DiscountStrategy promo = null;
+        String name = "None";
+
+        System.out.print("\n1 - No discount\n2 - Senior citizen\n3 - PWD\n4 - Student\n");
+        int choice = InputHelper.getValidInt("--> Discount: ", 1, 4);
+        if (choice >= 2) {
+            if (!InputHelper.getYesNo("Do you have a valid ID? (Y/N): ")) {
+                throw new InvalidDiscountException("A valid ID is required for this discount.");
+            }
+            if (choice == 2 && !counter && calculateAge(user.getBirthdate()) < 60) {
+                throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
+            }
+            switch (choice) {
+                case 2:
+                    identity = new SeniorDiscount();
+                    name = "Senior";
+                    break;
+                case 3:
+                    identity = new PWDDiscount();
+                    name = "PWD";
+                    break;
+                default:
+                    identity = new StudentDiscount();
+                    name = "Student";
+            }
+        }
+
+        if (InputHelper.getYesNo("Do you have a promo code? (Y/N): ")) {
+            String code = InputHelper.getValidName("Promo code: ", 4, 12);
+            Discount found = null;
+            for (Discount d : ds.getDiscounts()) {
+                if (d.getCode().equalsIgnoreCase(code)) {
+                    found = d;
+                }
+            }
+            if (found == null) {
+                throw new InvalidDiscountException("Promo code not found.");
+            }
+            if (!found.isActive()) {
+                throw new InvalidDiscountException("That promo is no longer active.");
+            }
+            if (found.getExpiryDate().compareTo(today()) < 0) {
+                throw new InvalidDiscountException("That promo has expired.");
+            }
+            if (identity != null && !found.isStackable()) {
+                throw new InvalidDiscountException("That promo cannot be used together with Senior, PWD or Student discounts.");
+            }
+            promo = new PromoDiscount(found.getType(), found.getValue());
+            if (identity == null) {
+                name = "Promo " + found.getCode();
+            } else {
+                name = name + " + Promo " + found.getCode();
+            }
+        }
+
+        double result = ticketSubtotal;
+        if (identity != null) {
+            result = identity.apply(result);
+        }
+        if (promo != null) {
+            result = promo.apply(result);
+        }
+        discountName[0] = name;
+        return result;
+    }
+
+    // returns the payment method (CREDIT, DEBIT, EWALLET, CASH), or "" if the user gave up
+    private static String takePayment(double total, boolean counter, RegisteredUser user) {
+        int choice = 0;
+        boolean useSaved = false;
+        String accountNumber = "none";
+
+        if (!counter && !user.getSavedPaymentType().equals("none")) {
+            if (InputHelper.getYesNo("Use your saved " + user.getSavedPaymentType() + " account? (Y/N): ")) {
+                useSaved = true;
+                accountNumber = user.getSavedPaymentNumber();
+                if (user.getSavedPaymentType().equals("CREDIT")) {
+                    choice = 1;
+                } else if (user.getSavedPaymentType().equals("DEBIT")) {
+                    choice = 2;
+                } else {
+                    choice = 3;
+                }
+            }
+        }
+        if (!useSaved) {
+            int max = 3;
+            System.out.print("\n1 - Credit card\n2 - Debit card\n3 - E-wallet");
+            if (counter) {
+                System.out.print("\n4 - Cash");
+                max = 4;
+            }
+            System.out.print("\n");
+            choice = InputHelper.getValidInt("--> Payment method: ", 1, max);
+        }
+
+        PaymentStrategy payment;
+        switch (choice) {
+            case 1:
+                payment = new CreditCardPayment();
+                break;
+            case 2:
+                payment = new DebitCardPayment();
+                break;
+            case 3:
+                payment = new EWalletPayment();
+                break;
+            default:
+                payment = new CashPayment();
+        }
+        String[] methods = {"CREDIT", "DEBIT", "EWALLET", "CASH"};
+
+        String result = "";
+        boolean done = false;
+        boolean firstTry = true;
+        while (!done) {
+            if (choice != 4 && !(useSaved && firstTry)) {
+                accountNumber = InputHelper.getValidName("Account number: ", 1, 30);
+            }
+            firstTry = false;
+
+            try {
+                payment.pay(total, accountNumber);
+                result = methods[choice - 1];
+                done = true;
+            } catch (PaymentFailedException e) {
+                System.out.println("Error: " + e.getMessage());
+                if (!InputHelper.getYesNo("Try again? (Y/N): ")) {
+                    System.out.println("Payment cancelled. Nothing was booked.");
+                    done = true;
+                }
+            }
+        }
+        return result;
     }
 
     public static void printTicket(Booking b) {
