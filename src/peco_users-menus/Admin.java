@@ -257,6 +257,21 @@ public class Admin extends User {
         System.out.println("Hall added.");
     }
 
+    // a hall cannot change size while an upcoming showing in it has booked seats
+    private void checkHallSizeCanChange(Hall h) throws InvalidInputException {
+        DataStore ds = DataStore.getInstance();
+
+        for (Schedule s : ds.getSchedules()) {
+            if (s.getHallId() == h.getId() && Guest.isUpcoming(s)) {
+                for (SeatLedgerEntry e : ds.getLedger()) {
+                    if (e.getScheduleId() == s.getId()) {
+                        throw new InvalidInputException("Cannot change the size: seats are already booked for an upcoming showing in this hall.");
+                    }
+                }
+            }
+        }
+    }
+
     private void editHall() {
         DataStore ds = DataStore.getInstance();
 
@@ -280,11 +295,13 @@ public class Admin extends User {
                         System.out.println("Hall name updated.");
                         break;
                     case 3:
+                        checkHallSizeCanChange(h);
                         h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
                         ds.saveHalls();
                         System.out.println("Rows updated.");
                         break;
                     case 4:
+                        checkHallSizeCanChange(h);
                         h.setColumns(InputHelper.getValidInt("New columns (4-20): ", 4, 20));
                         ds.saveHalls();
                         System.out.println("Columns updated.");
