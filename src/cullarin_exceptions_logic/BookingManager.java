@@ -1022,7 +1022,17 @@ public class BookingManager {
             if (schedule == null) {
                 throw new InvalidInputException("Choose a schedule ID from the list.");
             }
-            int seatCount = InputHelper.getValidInt("Number of seats (20-200): ", 20, 200);
+            Hall hall = ds.findHallById(schedule.getHallId());
+            if (hall == null) {
+                throw new InvalidInputException("The hall for this schedule was not found.");
+            }
+            int freeSeats = countFreeSeats(schedule, hall);
+            if (freeSeats < 20) {
+                throw new InvalidInputException("This showing only has " + freeSeats + " seat(s) available, which is below the minimum of 20 for a bulk request.");
+            }
+            int maxSeats = Math.min(freeSeats, 200);
+            System.out.println("Available seats for this showing: " + freeSeats + ".");
+            int seatCount = InputHelper.getValidInt("Number of seats (20-" + maxSeats + "): ", 20, maxSeats);
 
             ds.getBulkRequests().add(new BulkBookingRequest(ds.generateId(), requester, contact, scheduleId, seatCount, "PENDING", 0));
             ds.saveBulkRequests();
