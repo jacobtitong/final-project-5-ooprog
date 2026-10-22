@@ -660,7 +660,11 @@ public class BookingManager {
         boolean firstTry = true;
         while (!done) {
             if (choice != 4 && !(useSaved && firstTry)) {
-                accountNumber = InputHelper.getValidName("Account number: ", 1, 30);
+                // Derive the type string that getValidPaymentNumber expects so
+                // the format is validated here -- before it reaches the strategy --
+                // giving the user a clear, specific error message right away.
+                String[] types = {"CREDIT", "DEBIT", "EWALLET"};
+                accountNumber = InputHelper.getValidPaymentNumber("Account number: ", types[choice - 1]);
             }
             firstTry = false;
 
