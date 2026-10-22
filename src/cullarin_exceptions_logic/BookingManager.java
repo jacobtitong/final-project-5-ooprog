@@ -373,9 +373,16 @@ public class BookingManager {
                 String method = takePayment(total, counter, user);
 
                 if (!method.equals("")) {
-                    // 8. everything is saved only now
+                    // 8. everything is saved only now.
+                    // Reserve ALL IDs needed for this booking in a single atomic write:
+                    //   ids[0] = bookingId, ids[1] = transactionId,
+                    //   ids[2..N] = one snack-order ID per picked snack item.
+                    // The counter is persisted once here; a crash after this point
+                    // can only leave a harmless gap -- it cannot produce duplicate IDs.
+                    int[] ids = ds.generateIdBlock(2 + pickedSnacks.size());
+                    int bookingId     = ids[0];
+                    int transactionId = ids[1];
                     String timestamp = LocalDateTime.now().toString();
-                    int bookingId = ds.generateId();
 
                     for (String seat : seats) {
                         ds.getLedger().add(new SeatLedgerEntry(schedule.getId(), seat, bookingId));
@@ -388,14 +395,14 @@ public class BookingManager {
                     bookings.add(booking);
                     ds.saveBookings(path, bookings);
 
-                    ds.getTransactions().add(new Transaction(ds.generateId(), bookingId, ownerType, ownerId, schedule.getId(),
+                    ds.getTransactions().add(new Transaction(transactionId, bookingId, ownerType, ownerId, schedule.getId(),
                             seats.size(), discountedTickets, snackTotal, total, method, "SUCCESS", 0.0, timestamp));
                     ds.saveTransactions();
 
                     for (int i = 0; i < pickedSnacks.size(); i++) {
                         Snack snack = pickedSnacks.get(i);
                         snack.setStock(snack.getStock() - pickedQuantities.get(i));
-                        ds.getSnackOrders().add(new SnackOrder(ds.generateId(), bookingId, snack.getId(),
+                        ds.getSnackOrders().add(new SnackOrder(ids[2 + i], bookingId, snack.getId(),
                                 pickedQuantities.get(i), snack.getPrice()));
                     }
                     ds.saveSnacks();
@@ -1081,8 +1088,12 @@ public class BookingManager {
                 double subtotal = round2(schedule.getTicketPrice() * seats.size());
                 DiscountStrategy discount = new BulkDiscount(request.getSeatCount());
                 double total = discount.apply(subtotal);
+                // Reserve both IDs (bookingId + transactionId) in a single write
+                // before touching any file, so a mid-crash cannot create a duplicate.
+                int[] bulkIds      = ds.generateIdBlock(2);
+                int bookingId      = bulkIds[0];
+                int transactionId  = bulkIds[1];
                 String timestamp = LocalDateTime.now().toString();
-                int bookingId = ds.generateId();
 
                 String seatsText = "";
                 for (int i = 0; i < seats.size(); i++) {
@@ -1101,7 +1112,7 @@ public class BookingManager {
                 bookings.add(booking);
                 ds.saveBookings(path, bookings);
 
-                ds.getTransactions().add(new Transaction(ds.generateId(), bookingId, "BULK", 0, schedule.getId(),
+                ds.getTransactions().add(new Transaction(transactionId, bookingId, "BULK", 0, schedule.getId(),
                         seats.size(), total, 0.0, total, "CASH", "SUCCESS", 0.0, timestamp));
                 ds.saveTransactions();
 
