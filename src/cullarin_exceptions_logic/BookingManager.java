@@ -957,6 +957,24 @@ public class BookingManager {
 
     // ----- review -----
 
+    // Returns true when the user has at least one CONFIRMED booking for a
+    // showing of the given movie whose showtime is already in the past.
+    private static boolean hasPastConfirmedBookingFor(RegisteredUser u, int movieId) {
+        DataStore ds = DataStore.getInstance();
+        ArrayList<Booking> bookings = ds.loadBookings(ds.getUserBookingsPath(u.getId()));
+
+        for (Booking b : bookings) {
+            if (!b.getStatus().equals("CONFIRMED")) {
+                continue;
+            }
+            Schedule s = ds.findScheduleById(b.getScheduleId());
+            if (s != null && s.getMovieId() == movieId && !isUpcoming(s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void submitReview(RegisteredUser u) {
         DataStore ds = DataStore.getInstance();
 
@@ -965,6 +983,10 @@ public class BookingManager {
             int movieId = InputHelper.getValidInt("Movie ID to review: ", 1, 999999);
             if (ds.findMovieById(movieId) == null) {
                 throw new InvalidInputException("Movie ID not found.");
+            }
+            if (!hasPastConfirmedBookingFor(u, movieId)) {
+                throw new InvalidInputException(
+                        "You can only review a movie after attending a confirmed showing of it.");
             }
             int rating = InputHelper.getValidInt("Rating (1-5): ", 1, 5);
             String comment = InputHelper.getValidText("Comment (up to 100 characters, press Enter to skip): ", 0, 100);
