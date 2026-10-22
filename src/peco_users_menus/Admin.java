@@ -91,6 +91,21 @@ public class Admin extends User {
         }
     }
 
+    // returns true when another movie (other than skipId) already has the same
+    // title (case-insensitive)
+    private boolean movieTitleExists(String title, int skipId) {
+        DataStore ds = DataStore.getInstance();
+        for (Movie m : ds.getMovies()) {
+            if (m.getId() == skipId) {
+                continue;
+            }
+            if (m.getTitle().equalsIgnoreCase(title)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Movie chooseMovie() throws InvalidInputException {
         DataStore ds = DataStore.getInstance();
 
@@ -113,16 +128,23 @@ public class Admin extends User {
     private void addMovie() {
         DataStore ds = DataStore.getInstance();
 
-        String title = InputHelper.getValidName("Title (1-40 letters, digits, spaces): ", 1, 40);
-        String genre = InputHelper.getValidName("Genre (letters, digits, spaces): ", 2, 20);
-        String language = InputHelper.getValidName("Language: ", 2, 20);
-        String ageRating = chooseAgeRating();
-        String synopsis = InputHelper.getValidText("Synopsis (up to 200 characters): ", 1, 200);
-        int duration = InputHelper.getValidInt("Duration in minutes (30-300): ", 30, 300);
+        try {
+            String title = InputHelper.getValidName("Title (1-40 letters, digits, spaces): ", 1, 40);
+            if (movieTitleExists(title, -1)) {
+                throw new InvalidInputException("A movie titled \"" + title + "\" already exists.");
+            }
+            String genre = InputHelper.getValidName("Genre (letters, digits, spaces): ", 2, 20);
+            String language = InputHelper.getValidName("Language: ", 2, 20);
+            String ageRating = chooseAgeRating();
+            String synopsis = InputHelper.getValidText("Synopsis (up to 200 characters): ", 1, 200);
+            int duration = InputHelper.getValidInt("Duration in minutes (30-300): ", 30, 300);
 
-        ds.getMovies().add(new Movie(ds.generateId(), title, genre, language, ageRating, synopsis, duration));
-        ds.saveMovies();
-        System.out.println("Movie added.");
+            ds.getMovies().add(new Movie(ds.generateId(), title, genre, language, ageRating, synopsis, duration));
+            ds.saveMovies();
+            System.out.println("Movie added.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     private void editMovie() {
@@ -138,9 +160,14 @@ public class Admin extends User {
 
                 switch (option) {
                     case 1:
-                        m.setTitle(InputHelper.getValidName("New title (1-40): ", 1, 40));
-                        ds.saveMovies();
-                        System.out.println("Title updated.");
+                        String newTitle = InputHelper.getValidName("New title (1-40): ", 1, 40);
+                        if (movieTitleExists(newTitle, m.getId())) {
+                            System.out.println("Error: A movie titled \"" + newTitle + "\" already exists.");
+                        } else {
+                            m.setTitle(newTitle);
+                            ds.saveMovies();
+                            System.out.println("Title updated.");
+                        }
                         break;
                     case 2:
                         m.setGenre(InputHelper.getValidName("New genre: ", 2, 20));
