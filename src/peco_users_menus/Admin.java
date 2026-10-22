@@ -476,12 +476,15 @@ public class Admin extends User {
             Movie m = chooseMovie();
             listHalls();
             Hall h = chooseHall();
-            String date = InputHelper.getValidDate("Date (YYYY-MM-DD): ");
+            String date = getValidFutureDate("Date (YYYY-MM-DD): ");
             String startTime = InputHelper.getValidTime("Start time (HH:MM, 24-hour): ");
             String format = chooseFormat();
             double price = InputHelper.getValidDouble("Ticket price (50.00-1000.00): ", 50, 1000);
 
             Schedule test = new Schedule(0, m.getId(), h.getId(), date, startTime, format, price);
+            if (!Guest.isUpcoming(test)) {
+                throw new InvalidInputException("Schedule cannot be in the past.");
+            }
             BookingManager.checkScheduleConflict(test, 0);
 
             ds.getSchedules().add(new Schedule(ds.generateId(), m.getId(), h.getId(), date, startTime, format, price));
@@ -534,7 +537,7 @@ public class Admin extends User {
             listHalls();
             hallId = chooseHall().getId();
         } else if (field == 3) {
-            date = InputHelper.getValidDate("New date (YYYY-MM-DD): ");
+            date = getValidFutureDate("New date (YYYY-MM-DD): ");
         } else if (field == 4) {
             startTime = InputHelper.getValidTime("New start time (HH:MM): ");
         } else if (field == 5) {
@@ -544,6 +547,9 @@ public class Admin extends User {
         }
 
         Schedule test = new Schedule(s.getId(), movieId, hallId, date, startTime, format, price);
+        if (!Guest.isUpcoming(test)) {
+            throw new InvalidInputException("Schedule cannot be in the past.");
+        }
         BookingManager.checkScheduleConflict(test, s.getId());
 
         s.setMovieId(movieId);
