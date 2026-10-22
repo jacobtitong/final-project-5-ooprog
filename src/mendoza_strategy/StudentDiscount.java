@@ -1,3 +1,5 @@
+package mendoza_strategy;
+
 public class StudentDiscount implements DiscountStrategy {
     @Override
     public double apply(double ticketSubtotal) {

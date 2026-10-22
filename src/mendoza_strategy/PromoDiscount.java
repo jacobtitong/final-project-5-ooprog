@@ -1,3 +1,5 @@
+package mendoza_strategy;
+
 public class PromoDiscount implements DiscountStrategy {
     private String type;
     private double value;

@@ -1,3 +1,5 @@
+package mendoza_strategy;
+
 public class SeniorDiscount implements DiscountStrategy {
     private static final double VAT_RATE = 0.12;
 
