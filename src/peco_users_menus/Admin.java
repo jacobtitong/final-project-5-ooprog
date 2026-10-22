@@ -241,6 +241,22 @@ public class Admin extends User {
         return h;
     }
 
+    // returns true when another hall (other than skipId) already has the same
+    // cinema location + hall name combination (case-insensitive)
+    private boolean hallNameExists(String location, String hallName, int skipId) {
+        DataStore ds = DataStore.getInstance();
+        for (Hall h : ds.getHalls()) {
+            if (h.getId() == skipId) {
+                continue;
+            }
+            if (h.getCinemaLocation().equalsIgnoreCase(location)
+                    && h.getHallName().equalsIgnoreCase(hallName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void listHalls() {
         DataStore ds = DataStore.getInstance();
 
@@ -260,14 +276,21 @@ public class Admin extends User {
     private void addHall() {
         DataStore ds = DataStore.getInstance();
 
-        String location = InputHelper.getValidName("Cinema location (2-30 letters, digits, spaces): ", 2, 30);
-        String hallName = InputHelper.getValidName("Hall name (2-30 letters, digits, spaces): ", 2, 30);
-        int rows = InputHelper.getValidInt("Rows (3-12): ", 3, 12);
-        int columns = InputHelper.getValidInt("Columns (4-20): ", 4, 20);
+        try {
+            String location = InputHelper.getValidName("Cinema location (2-30 letters, digits, spaces): ", 2, 30);
+            String hallName = InputHelper.getValidName("Hall name (2-30 letters, digits, spaces): ", 2, 30);
+            if (hallNameExists(location, hallName, -1)) {
+                throw new InvalidInputException("A hall named \"" + hallName + "\" already exists at that cinema location.");
+            }
+            int rows = InputHelper.getValidInt("Rows (3-12): ", 3, 12);
+            int columns = InputHelper.getValidInt("Columns (4-20): ", 4, 20);
 
-        ds.getHalls().add(new Hall(ds.generateId(), location, hallName, rows, columns));
-        ds.saveHalls();
-        System.out.println("Hall added.");
+            ds.getHalls().add(new Hall(ds.generateId(), location, hallName, rows, columns));
+            ds.saveHalls();
+            System.out.println("Hall added.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     private void editHall() {
@@ -283,14 +306,24 @@ public class Admin extends User {
 
                 switch (option) {
                     case 1:
-                        h.setCinemaLocation(InputHelper.getValidName("New cinema location: ", 2, 30));
-                        ds.saveHalls();
-                        System.out.println("Cinema location updated.");
+                        String newLocation = InputHelper.getValidName("New cinema location: ", 2, 30);
+                        if (hallNameExists(newLocation, h.getHallName(), h.getId())) {
+                            System.out.println("Error: A hall named \"" + h.getHallName() + "\" already exists at that cinema location.");
+                        } else {
+                            h.setCinemaLocation(newLocation);
+                            ds.saveHalls();
+                            System.out.println("Cinema location updated.");
+                        }
                         break;
                     case 2:
-                        h.setHallName(InputHelper.getValidName("New hall name: ", 2, 30));
-                        ds.saveHalls();
-                        System.out.println("Hall name updated.");
+                        String newHallName = InputHelper.getValidName("New hall name: ", 2, 30);
+                        if (hallNameExists(h.getCinemaLocation(), newHallName, h.getId())) {
+                            System.out.println("Error: A hall named \"" + newHallName + "\" already exists at that cinema location.");
+                        } else {
+                            h.setHallName(newHallName);
+                            ds.saveHalls();
+                            System.out.println("Hall name updated.");
+                        }
                         break;
                     case 3:
                         h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
