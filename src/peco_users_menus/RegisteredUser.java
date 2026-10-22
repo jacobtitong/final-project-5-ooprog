@@ -69,8 +69,8 @@ public class RegisteredUser extends User {
         boolean loggedOut = false;
         while (!loggedOut) {
             System.out.print("\n=== REGISTERED USER MENU ===");
-            System.out.print("\n1 - Browse movies\n2 - View schedules\n3 - View movie synopsis\n4 - Search showtimes\n5 - Book tickets\n6 - Cancel a booking\n7 - Booking history\n8 - View a ticket\n9 - Review a movie\n10 - Edit profile\n11 - Deactivate my account\n12 - Logout\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 12);
+            System.out.print("\n1 - Browse movies\n2 - View schedules\n3 - View movie synopsis\n4 - Search showtimes\n5 - Book tickets\n6 - Cancel a booking\n7 - Booking history\n8 - View a ticket\n9 - Review a movie\n10 - View profile\n11 - Edit profile\n12 - Deactivate my account\n13 - Logout\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 13);
 
             switch (option) {
                 case 1:
@@ -101,18 +101,21 @@ public class RegisteredUser extends User {
                     BookingManager.submitReview(this);
                     break;
                 case 10:
-                    editProfile();
+                    viewProfile();
                     break;
                 case 11:
+                    editProfile();
+                    break;
+                case 12:
                     if (deactivate()) {
                         loggedOut = true;
                     }
                     break;
-                case 12:
+                case 13:
                     loggedOut = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-12.");
+                    System.out.println("Error: Invalid option. Please choose 1-13.");
             }
         }
 
@@ -159,6 +162,18 @@ public class RegisteredUser extends User {
             done = true;
         }
         return done;
+    }
+
+    // ----- view profile -----
+
+    public void viewProfile() {
+        System.out.println("\n=== USER PROFILE ===");
+        System.out.println("User ID: " + getId());
+        System.out.println("Name: " + getName());
+        System.out.println("Email: " + getEmail());
+        System.out.println("Birthdate: " + birthdate);
+        System.out.println("Saved payment: " + maskedPayment());
+        System.out.println("Status: " + (isActive() ? "Active" : "Inactive"));
     }
 
     // ----- edit profile -----
