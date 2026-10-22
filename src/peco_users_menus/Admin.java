@@ -780,8 +780,8 @@ public class Admin extends User {
         boolean back = false;
         while (!back) {
             System.out.print("\n=== MANAGE USER ACCOUNTS ===");
-            System.out.print("\n1 - List registered users\n2 - Deactivate a user\n3 - Back\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 3);
+            System.out.print("\n1 - List registered users\n2 - Deactivate a user\n3 - Reactivate a user\n4 - Back\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 4);
 
             switch (option) {
                 case 1:
@@ -791,10 +791,13 @@ public class Admin extends User {
                     deactivateUser();
                     break;
                 case 3:
+                    reactivateUser();
+                    break;
+                case 4:
                     back = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-3.");
+                    System.out.println("Error: Invalid option. Please choose 1-4.");
             }
         }
     }
@@ -842,6 +845,34 @@ public class Admin extends User {
                 found.setActive(false);
                 ds.saveUsers();
                 System.out.println("Account deactivated.");
+            }
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private void reactivateUser() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            listUsers();
+            int id = InputHelper.getValidInt("User ID to reactivate: ", 1, 999999);
+            User found = null;
+            for (User u : ds.getUsers()) {
+                if (u instanceof RegisteredUser && u.getId() == id) {
+                    found = u;
+                }
+            }
+            if (found == null) {
+                throw new InvalidInputException("Registered user ID not found.");
+            }
+            if (found.isActive()) {
+                throw new InvalidInputException("That account is already active.");
+            }
+            if (InputHelper.getYesNo("Reactivate " + found.getName() + "? (Y/N): ")) {
+                found.setActive(true);
+                ds.saveUsers();
+                System.out.println("Account reactivated.");
             }
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
