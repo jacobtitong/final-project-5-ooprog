@@ -1062,6 +1062,7 @@ public class BookingManager {
             ds.saveTransactions();
             // the refund is settled, so the cancelled booking's seats can be sold again
             releaseSeats(chosen.getBookingId());
+            AuditLogger.log(cs, "PROCESS_REFUND", "txnID=" + chosen.getId() + " bookingID=" + chosen.getBookingId() + " amount=" + round2(amount));
             System.out.printf("Refund of Php %.2f recorded by %s.%n", round2(amount), cs.getName());
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
@@ -1148,6 +1149,7 @@ public class BookingManager {
 
             ds.getBulkRequests().add(new BulkBookingRequest(ds.generateId(), requester, contact, scheduleId, seatCount, "PENDING", 0));
             ds.saveBulkRequests();
+            AuditLogger.log(cs, "CREATE_BULK_REQUEST", "requester=" + requester + " scheduleID=" + scheduleId + " seats=" + seatCount);
             System.out.println("Bulk request saved as PENDING. An Admin will review it.");
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
@@ -1195,6 +1197,7 @@ public class BookingManager {
                 request.setStatus("REJECTED");
                 request.setReviewerId(a.getId());
                 ds.saveBulkRequests();
+                AuditLogger.log(a, "REJECT_BULK", "requestID=" + request.getId() + " requester=" + request.getRequesterName());
                 System.out.println("Request rejected.");
             } else {
                 Schedule schedule = ds.findScheduleById(request.getScheduleId());
@@ -1241,6 +1244,7 @@ public class BookingManager {
                 request.setStatus("APPROVED");
                 request.setReviewerId(a.getId());
                 ds.saveBulkRequests();
+                AuditLogger.log(a, "APPROVE_BULK", "requestID=" + request.getId() + " booking=" + bookingRef(bookingId) + " seats=" + seats.size());
 
                 System.out.println("Request approved. Booking " + bookingRef(bookingId) + " was created.");
                 printTicket(booking);

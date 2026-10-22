@@ -9,6 +9,7 @@ import titong_model_data.Hall;
 import titong_model_data.Movie;
 import titong_model_data.Review;
 import titong_model_data.Schedule;
+import cullarin_exceptions_logic.AuditLogger;
 import titong_model_data.SeatLedgerEntry;
 
 public class Admin extends User {
@@ -21,8 +22,8 @@ public class Admin extends User {
         boolean loggedOut = false;
         while (!loggedOut) {
             System.out.print("\n=== ADMIN MENU ===");
-            System.out.print("\n1 - Manage movies\n2 - Manage halls\n3 - Manage schedules\n4 - Manage discounts and promos\n5 - Review bulk requests\n6 - Manage user accounts\n7 - Revenue report\n8 - System configuration\n9 - Logout\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 9);
+            System.out.print("\n1 - Manage movies\n2 - Manage halls\n3 - Manage schedules\n4 - Manage discounts and promos\n5 - Review bulk requests\n6 - Manage user accounts\n7 - Revenue report\n8 - System configuration\n9 - View audit log\n10 - Logout\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 10);
 
             switch (option) {
                 case 1:
@@ -50,10 +51,13 @@ public class Admin extends User {
                     manageConfig();
                     break;
                 case 9:
+                    viewAuditLog();
+                    break;
+                case 10:
                     loggedOut = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-9.");
+                    System.out.println("Error: Invalid option. Please choose 1-10.");
             }
         }
 
@@ -141,6 +145,7 @@ public class Admin extends User {
 
             ds.getMovies().add(new Movie(ds.generateId(), title, genre, language, ageRating, synopsis, duration));
             ds.saveMovies();
+            AuditLogger.log(this, "ADD_MOVIE", "Title: " + title);
             System.out.println("Movie added.");
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
@@ -166,32 +171,38 @@ public class Admin extends User {
                         } else {
                             m.setTitle(newTitle);
                             ds.saveMovies();
+                            AuditLogger.log(this, "EDIT_MOVIE", "ID=" + m.getId() + " title -> " + newTitle);
                             System.out.println("Title updated.");
                         }
                         break;
                     case 2:
                         m.setGenre(InputHelper.getValidName("New genre: ", 2, 20));
                         ds.saveMovies();
+                        AuditLogger.log(this, "EDIT_MOVIE", "ID=" + m.getId() + " genre -> " + m.getGenre());
                         System.out.println("Genre updated.");
                         break;
                     case 3:
                         m.setLanguage(InputHelper.getValidName("New language: ", 2, 20));
                         ds.saveMovies();
+                        AuditLogger.log(this, "EDIT_MOVIE", "ID=" + m.getId() + " language -> " + m.getLanguage());
                         System.out.println("Language updated.");
                         break;
                     case 4:
                         m.setAgeRating(chooseAgeRating());
                         ds.saveMovies();
+                        AuditLogger.log(this, "EDIT_MOVIE", "ID=" + m.getId() + " ageRating -> " + m.getAgeRating());
                         System.out.println("Age rating updated.");
                         break;
                     case 5:
                         m.setSynopsis(InputHelper.getValidText("New synopsis (up to 200 characters): ", 1, 200));
                         ds.saveMovies();
+                        AuditLogger.log(this, "EDIT_MOVIE", "ID=" + m.getId() + " synopsis updated");
                         System.out.println("Synopsis updated.");
                         break;
                     case 6:
                         m.setDurationMinutes(InputHelper.getValidInt("New duration in minutes (30-300): ", 30, 300));
                         ds.saveMovies();
+                        AuditLogger.log(this, "EDIT_MOVIE", "ID=" + m.getId() + " duration -> " + m.getDurationMinutes() + " min");
                         System.out.println("Duration updated.");
                         break;
                     case 7:
@@ -219,6 +230,7 @@ public class Admin extends User {
             if (InputHelper.getYesNo("Remove " + m.getTitle() + "? (Y/N): ")) {
                 ds.getMovies().remove(m);
                 ds.saveMovies();
+                AuditLogger.log(this, "REMOVE_MOVIE", "ID=" + m.getId() + " title: " + m.getTitle());
                 System.out.println("Movie removed.");
             }
         } catch (InvalidInputException e) {
@@ -314,6 +326,7 @@ public class Admin extends User {
 
             ds.getHalls().add(new Hall(ds.generateId(), location, hallName, rows, columns));
             ds.saveHalls();
+            AuditLogger.log(this, "ADD_HALL", location + " / " + hallName + " rows=" + rows + " cols=" + columns);
             System.out.println("Hall added.");
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
@@ -361,6 +374,7 @@ public class Admin extends User {
                         } else {
                             h.setCinemaLocation(newLocation);
                             ds.saveHalls();
+                            AuditLogger.log(this, "EDIT_HALL", "ID=" + h.getId() + " location -> " + newLocation);
                             System.out.println("Cinema location updated.");
                         }
                         break;
@@ -371,6 +385,7 @@ public class Admin extends User {
                         } else {
                             h.setHallName(newHallName);
                             ds.saveHalls();
+                            AuditLogger.log(this, "EDIT_HALL", "ID=" + h.getId() + " hallName -> " + newHallName);
                             System.out.println("Hall name updated.");
                         }
                         break;
@@ -383,6 +398,7 @@ public class Admin extends User {
                         } else {
                             h.setRows(newRows);
                             ds.saveHalls();
+                            AuditLogger.log(this, "EDIT_HALL", "ID=" + h.getId() + " rows -> " + newRows);
                             System.out.println("Rows updated.");
                         }
                         break;
@@ -395,6 +411,7 @@ public class Admin extends User {
                         } else {
                             h.setColumns(newColumns);
                             ds.saveHalls();
+                            AuditLogger.log(this, "EDIT_HALL", "ID=" + h.getId() + " columns -> " + newColumns);
                             System.out.println("Columns updated.");
                         }
                         break;
@@ -423,6 +440,7 @@ public class Admin extends User {
             if (InputHelper.getYesNo("Remove " + h.getHallName() + "? (Y/N): ")) {
                 ds.getHalls().remove(h);
                 ds.saveHalls();
+                AuditLogger.log(this, "REMOVE_HALL", "ID=" + h.getId() + " name: " + h.getHallName());
                 System.out.println("Hall removed.");
             }
         } catch (InvalidInputException e) {
@@ -501,6 +519,7 @@ public class Admin extends User {
 
             ds.getSchedules().add(new Schedule(ds.generateId(), m.getId(), h.getId(), date, startTime, format, price));
             ds.saveSchedules();
+            AuditLogger.log(this, "ADD_SCHEDULE", "movie=" + m.getId() + " hall=" + h.getId() + " " + date + " " + startTime);
             System.out.println("Schedule added.");
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
@@ -571,6 +590,7 @@ public class Admin extends User {
         s.setFormat(format);
         s.setTicketPrice(price);
         ds.saveSchedules();
+        AuditLogger.log(this, "EDIT_SCHEDULE", "ID=" + s.getId() + " field=" + field);
         System.out.println("Schedule updated.");
     }
 
@@ -588,6 +608,7 @@ public class Admin extends User {
             if (InputHelper.getYesNo("Remove schedule " + s.getId() + "? (Y/N): ")) {
                 ds.getSchedules().remove(s);
                 ds.saveSchedules();
+                AuditLogger.log(this, "REMOVE_SCHEDULE", "ID=" + s.getId());
                 System.out.println("Schedule removed.");
             }
         } catch (InvalidInputException e) {
@@ -713,6 +734,7 @@ public class Admin extends User {
 
             ds.getDiscounts().add(new Discount(code, type, value, stackable, expiry, true));
             ds.saveDiscounts();
+            AuditLogger.log(this, "CREATE_PROMO", "code=" + code + " type=" + type + " value=" + value + " expiry=" + expiry);
             System.out.println("Promo created.");
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
@@ -742,10 +764,12 @@ public class Admin extends User {
                         d.setValue(InputHelper.getValidDouble("Amount off in Php (1.00-500.00): ", 1, 500));
                     }
                     ds.saveDiscounts();
+                    AuditLogger.log(this, "EDIT_PROMO", "code=" + d.getCode() + " type/value updated");
                     System.out.println("Promo updated.");
                 } else if (option == 2) {
                     d.setStackable(InputHelper.getYesNo("Can it be used together with Senior/PWD/Student discounts? (Y/N): "));
                     ds.saveDiscounts();
+                    AuditLogger.log(this, "EDIT_PROMO", "code=" + d.getCode() + " stackable updated");
                     System.out.println("Promo updated.");
                 } else {
                     done = true;
@@ -768,6 +792,7 @@ public class Admin extends User {
             }
             d.setExpiryDate(newDate);
             ds.saveDiscounts();
+            AuditLogger.log(this, "EXTEND_PROMO", "code=" + d.getCode() + " newExpiry=" + newDate);
             System.out.println("Promo extended.");
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
@@ -785,6 +810,7 @@ public class Admin extends User {
             if (InputHelper.getYesNo("Deactivate " + d.getCode() + "? (Y/N): ")) {
                 d.setActive(false);
                 ds.saveDiscounts();
+                AuditLogger.log(this, "DEACTIVATE_PROMO", "code=" + d.getCode());
                 System.out.println("Promo deactivated.");
             }
         } catch (InvalidInputException e) {
@@ -862,6 +888,7 @@ public class Admin extends User {
             if (InputHelper.getYesNo("Deactivate " + found.getName() + "? Their bookings stay. (Y/N): ")) {
                 found.setActive(false);
                 ds.saveUsers();
+                AuditLogger.log(this, "DEACTIVATE_USER", "userID=" + found.getId() + " name=" + found.getName());
                 System.out.println("Account deactivated.");
             }
         } catch (InvalidInputException e) {
@@ -890,6 +917,7 @@ public class Admin extends User {
             if (InputHelper.getYesNo("Reactivate " + found.getName() + "? (Y/N): ")) {
                 found.setActive(true);
                 ds.saveUsers();
+                AuditLogger.log(this, "REACTIVATE_USER", "userID=" + found.getId() + " name=" + found.getName());
                 System.out.println("Account reactivated.");
             }
         } catch (InvalidInputException e) {
@@ -928,9 +956,33 @@ public class Admin extends User {
     private void changeConfig(String key, String label, int min, int max) {
         DataStore ds = DataStore.getInstance();
 
-        System.out.println(label + " is currently " + ds.getConfigInt(key) + ".");
+        int oldValue = ds.getConfigInt(key);
+        System.out.println(label + " is currently " + oldValue + ".");
         int value = InputHelper.getValidInt("New value (" + min + "-" + max + "): ", min, max);
         ds.setConfig(key, String.valueOf(value));
+        AuditLogger.log(this, "CHANGE_CONFIG", key + " " + oldValue + " -> " + value);
         System.out.println(label + " updated.");
     }
-}
+
+    // ----- audit log viewer -----
+
+    private void viewAuditLog() {
+        DataStore ds = DataStore.getInstance();
+        java.util.ArrayList<titong_model_data.AuditLog> log = ds.getAuditLog();
+
+        if (log.size() == 0) {
+            System.out.println("The audit log is empty.");
+            return;
+        }
+        String line = "-----------------------------------------------------------------------------------------";
+        System.out.println("\n" + line);
+        System.out.printf("%-26s | %-16s | %-20s | %-18s | %s%n",
+                "Timestamp", "Role", "Name", "Action", "Detail");
+        System.out.println(line);
+        for (titong_model_data.AuditLog entry : log) {
+            System.out.printf("%-26.26s | %-16.16s | %-20.20s | %-18.18s | %s%n",
+                    entry.getTimestamp(), entry.getActorRole(),
+                    entry.getActorName(), entry.getAction(), entry.getDetail());
+        }
+    }
+}

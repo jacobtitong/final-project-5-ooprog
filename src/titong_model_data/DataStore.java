@@ -9,6 +9,7 @@ import peco_users_menus.User;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import titong_model_data.AuditLog;
 
 public class DataStore {
     private static volatile DataStore instance;
@@ -25,6 +26,8 @@ public class DataStore {
     private ArrayList<BulkBookingRequest> bulkRequests = new ArrayList<>();
     private ArrayList<Review> reviews = new ArrayList<>();
     private ArrayList<SystemConfig> configs = new ArrayList<>();
+    private ArrayList<AuditLog> auditLog = new ArrayList<>();
+    private static final String FILE_AUDIT = "audit_log.txt";
 
     // Tracks the last-modified timestamp of each file when it was last loaded.
     // If the file's current lastModified() differs from what is stored here,
@@ -786,5 +789,30 @@ public class DataStore {
             }
         }
         return null;
+    }
+
+    public String getAuditLogPath() { return FILE_AUDIT; }
+
+    public ArrayList<AuditLog> getAuditLog() {
+        auditLog.clear();
+        loadAuditLog();
+        return auditLog;
+    }
+
+    private void loadAuditLog() {
+        try {
+            java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(FILE_AUDIT));
+            String line = br.readLine();
+            while (line != null) {
+                String[] p = line.split("\\|", 6);
+                if (p.length == 6) {
+                    auditLog.add(new AuditLog(p[0], p[1], Integer.parseInt(p[2]), p[3], p[4], p[5]));
+                }
+                line = br.readLine();
+            }
+            br.close();
+        } catch (java.io.IOException e) {
+            // file not created yet: start with an empty list
+        }
     }
 }
