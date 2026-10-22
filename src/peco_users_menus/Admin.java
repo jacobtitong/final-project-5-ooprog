@@ -320,6 +320,22 @@ public class Admin extends User {
         }
     }
 
+    // returns true when any schedule in this hall has at least one confirmed
+    // booking in the seat ledger
+    private boolean hallHasBookings(int hallId) {
+        DataStore ds = DataStore.getInstance();
+        for (Schedule s : ds.getSchedules()) {
+            if (s.getHallId() == hallId) {
+                for (SeatLedgerEntry e : ds.getLedger()) {
+                    if (e.getScheduleId() == s.getId()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     private void editHall() {
         DataStore ds = DataStore.getInstance();
 
@@ -353,14 +369,22 @@ public class Admin extends User {
                         }
                         break;
                     case 3:
-                        h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
-                        ds.saveHalls();
-                        System.out.println("Rows updated.");
+                        if (hallHasBookings(h.getId())) {
+                            System.out.println("Error: Cannot change rows — this hall has confirmed bookings.");
+                        } else {
+                            h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
+                            ds.saveHalls();
+                            System.out.println("Rows updated.");
+                        }
                         break;
                     case 4:
-                        h.setColumns(InputHelper.getValidInt("New columns (4-20): ", 4, 20));
-                        ds.saveHalls();
-                        System.out.println("Columns updated.");
+                        if (hallHasBookings(h.getId())) {
+                            System.out.println("Error: Cannot change columns — this hall has confirmed bookings.");
+                        } else {
+                            h.setColumns(InputHelper.getValidInt("New columns (4-20): ", 4, 20));
+                            ds.saveHalls();
+                            System.out.println("Columns updated.");
+                        }
                         break;
                     case 5:
                         done = true;
