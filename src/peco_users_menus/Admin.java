@@ -559,7 +559,14 @@ public class Admin extends User {
             System.out.println("-----------------------------------------------------------------------");
             for (Discount d : ds.getDiscounts()) {
                 String stackable = d.isStackable() ? "Yes" : "No";
-                String status = d.isActive() ? "Active" : "Inactive";
+                String status;
+                if (!d.isActive()) {
+                    status = "Inactive";
+                } else if (d.getExpiryDate().compareTo(BookingManager.today()) < 0) {
+                    status = "Expired";
+                } else {
+                    status = "Active";
+                }
                 System.out.printf("%-12s | %-8s | %-10.2f | %-9s | %-10s | %-8s%n",
                         d.getCode(), d.getType(), d.getValue(), stackable, d.getExpiryDate(), status);
             }
