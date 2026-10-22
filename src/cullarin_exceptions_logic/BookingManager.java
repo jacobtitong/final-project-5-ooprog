@@ -1213,6 +1213,17 @@ public class BookingManager {
                 double subtotal = round2(schedule.getTicketPrice() * seats.size());
                 DiscountStrategy discount = new BulkDiscount(request.getSeatCount());
                 double total = discount.apply(subtotal);
+
+                System.out.printf("\nBulk tickets (%d seats): Php %.2f%n", seats.size(), subtotal);
+                System.out.printf("Bulk discount (15%%): -Php %.2f%n", round2(subtotal - total));
+                System.out.printf("TOTAL DUE: Php %.2f%n", total);
+
+                String method = takePayment(total, true, null);
+                if (method.equals("")) {
+                    System.out.println("Payment cancelled. Request stays PENDING.");
+                    return;
+                }
+
                 // Reserve both IDs (bookingId + transactionId) in a single write
                 // before touching any file, so a mid-crash cannot create a duplicate.
                 int[] bulkIds      = ds.generateIdBlock(2);
@@ -1238,13 +1249,13 @@ public class BookingManager {
                 ds.saveBookings(path, bookings);
 
                 ds.getTransactions().add(new Transaction(transactionId, bookingId, "BULK", 0, schedule.getId(),
-                        seats.size(), total, 0.0, total, "CASH", "SUCCESS", 0.0, timestamp));
+                        seats.size(), total, 0.0, total, method, "SUCCESS", 0.0, timestamp));
                 ds.saveTransactions();
 
                 request.setStatus("APPROVED");
                 request.setReviewerId(a.getId());
                 ds.saveBulkRequests();
-                AuditLogger.log(a, "APPROVE_BULK", "requestID=" + request.getId() + " booking=" + bookingRef(bookingId) + " seats=" + seats.size());
+                AuditLogger.log(a, "APPROVE_BULK", "requestID=" + request.getId() + " booking=" + bookingRef(bookingId) + " seats=" + seats.size() + " method=" + method);
 
                 System.out.println("Request approved. Booking " + bookingRef(bookingId) + " was created.");
                 printTicket(booking);
