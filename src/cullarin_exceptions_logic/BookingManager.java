@@ -29,6 +29,7 @@ import titong_model_data.Snack;
 import titong_model_data.SnackOrder;
 import titong_model_data.Transaction;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -83,6 +84,27 @@ public class BookingManager {
             upcoming = true;
         }
         return upcoming;
+    }
+
+    // a booking can only be cancelled up to this many minutes before showtime
+    public static final int CANCEL_DEADLINE_MINUTES = 30;
+
+    // minutes from now until the showing starts (negative once it has started)
+    private static long minutesUntilStart(Schedule s) {
+        LocalDateTime start = LocalDateTime.of(LocalDate.parse(s.getDate()), LocalTime.parse(s.getStartTime()));
+        return Duration.between(LocalDateTime.now(), start).toMinutes();
+    }
+
+    // removes every seat a booking holds from the ledger and saves it
+    private static void releaseSeats(int bookingId) {
+        DataStore ds = DataStore.getInstance();
+
+        for (int i = ds.getLedger().size() - 1; i >= 0; i--) {
+            if (ds.getLedger().get(i).getBookingId() == bookingId) {
+                ds.getLedger().remove(i);
+            }
+        }
+        ds.saveLedger();
     }
 
     private static String bookingRef(int id) {
@@ -784,14 +806,27 @@ public class BookingManager {
             String path = ds.getUserBookingsPath(u.getId());
             ArrayList<Booking> bookings = ds.loadBookings(path);
             ArrayList<Booking> eligible = new ArrayList<>();
+            int tooLate = 0;
             for (Booking b : bookings) {
                 Schedule s = ds.findScheduleById(b.getScheduleId());
                 if (b.getStatus().equals("CONFIRMED") && s != null && isUpcoming(s)) {
-                    eligible.add(b);
+                    if (minutesUntilStart(s) >= CANCEL_DEADLINE_MINUTES) {
+                        eligible.add(b);
+                    } else {
+                        tooLate++;
+                    }
                 }
             }
             if (eligible.size() == 0) {
+                if (tooLate > 0) {
+                    throw new InvalidInputException("Bookings can only be cancelled at least " + CANCEL_DEADLINE_MINUTES
+                            + " minutes before showtime.");
+                }
                 throw new InvalidInputException("You have no bookings that can be cancelled.");
+            }
+            if (tooLate > 0) {
+                System.out.println("Note: " + tooLate + " booking(s) are less than " + CANCEL_DEADLINE_MINUTES
+                        + " minutes from showtime and can no longer be cancelled.");
             }
 
             System.out.println("\nBookings you can cancel:");
@@ -808,22 +843,29 @@ public class BookingManager {
             }
 
             if (InputHelper.getYesNo("Cancel booking " + bookingRef(chosen.getId()) + "? (Y/N): ")) {
+                // check the deadline again: time may have passed while the user was deciding
+                Schedule s = ds.findScheduleById(chosen.getScheduleId());
+                if (s == null || minutesUntilStart(s) < CANCEL_DEADLINE_MINUTES) {
+                    throw new InvalidInputException("The cancellation deadline (" + CANCEL_DEADLINE_MINUTES
+                            + " minutes before showtime) has passed.");
+                }
+
                 chosen.setStatus("CANCELLED");
                 ds.saveBookings(path, bookings);
 
-                for (int i = ds.getLedger().size() - 1; i >= 0; i--) {
-                    if (ds.getLedger().get(i).getBookingId() == chosen.getId()) {
-                        ds.getLedger().remove(i);
-                    }
-                }
-                ds.saveLedger();
-
+                // the seats stay reserved in the ledger until Customer Service processes
+                // the refund (see processRefund), so nobody can rebook them before then
                 Transaction t = findTransaction(chosen.getId());
                 if (t != null) {
                     t.setStatus("REFUND_PENDING");
                     ds.saveTransactions();
+                    System.out.println("Booking cancelled. Your refund is now waiting for Customer Service.");
+                    System.out.println("Your seats stay reserved until the refund is processed.");
+                } else {
+                    // no payment record means there is no refund to wait for
+                    releaseSeats(chosen.getId());
+                    System.out.println("Booking cancelled.");
                 }
-                System.out.println("Booking cancelled. Your refund is now waiting for Customer Service.");
             }
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
@@ -950,6 +992,8 @@ public class BookingManager {
             chosen.setRefundAmount(round2(amount));
             chosen.setStatus("REFUNDED");
             ds.saveTransactions();
+            // the refund is settled, so the cancelled booking's seats can be sold again
+            releaseSeats(chosen.getBookingId());
             System.out.printf("Refund of Php %.2f recorded by %s.%n", round2(amount), cs.getName());
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
