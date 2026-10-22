@@ -1,4 +1,5 @@
 package peco_users_menus;
+import cullarin_exceptions_logic.AuditLogger;
 import cullarin_exceptions_logic.InvalidInputException;
 import titong_model_data.DataStore;
 import titong_model_data.Snack;
@@ -97,6 +98,7 @@ public class SnackManager extends User {
 
         ds.getSnacks().add(new Snack(ds.generateId(), name, price, stock, true));
         ds.saveSnacks();
+        AuditLogger.log(this, "ADD_SNACK", "name=" + name + " price=" + price + " stock=" + stock);
         System.out.println("Snack added.");
     }
 
@@ -107,6 +109,7 @@ public class SnackManager extends User {
             Snack s = chooseSnack();
             s.setName(InputHelper.getValidName("New name (2-30 letters, digits, spaces): ", 2, 30));
             ds.saveSnacks();
+            AuditLogger.log(this, "EDIT_SNACK", "ID=" + s.getId() + " name -> " + s.getName());
             System.out.println("Snack name updated.");
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
@@ -120,6 +123,7 @@ public class SnackManager extends User {
             Snack s = chooseSnack();
             s.setPrice(InputHelper.getValidDouble("New price (1.00-500.00): ", 1, 500));
             ds.saveSnacks();
+            AuditLogger.log(this, "EDIT_SNACK", "ID=" + s.getId() + " price -> " + s.getPrice());
             System.out.println("Snack price updated.");
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
@@ -134,6 +138,7 @@ public class SnackManager extends User {
             System.out.println("Current stock: " + s.getStock());
             s.setStock(InputHelper.getValidInt("New stock (0-1000): ", 0, 1000));
             ds.saveSnacks();
+            AuditLogger.log(this, "EDIT_SNACK", "ID=" + s.getId() + " stock -> " + s.getStock());
             System.out.println("Snack stock updated.");
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
@@ -151,6 +156,7 @@ public class SnackManager extends User {
             if (InputHelper.getYesNo("Discontinue " + s.getName() + "? (Y/N): ")) {
                 s.setActive(false);
                 ds.saveSnacks();
+                AuditLogger.log(this, "DISCONTINUE_SNACK", "ID=" + s.getId() + " name=" + s.getName());
                 System.out.println("Snack discontinued.");
             }
         } catch (InvalidInputException e) {
@@ -179,9 +185,11 @@ public class SnackManager extends User {
     private void setThreshold() {
         DataStore ds = DataStore.getInstance();
 
-        System.out.println("Current low-stock threshold: " + ds.getConfigInt("LOW_STOCK_THRESHOLD"));
+        int oldThreshold = ds.getConfigInt("LOW_STOCK_THRESHOLD");
+        System.out.println("Current low-stock threshold: " + oldThreshold);
         int value = InputHelper.getValidInt("New threshold (1-100): ", 1, 100);
         ds.setConfig("LOW_STOCK_THRESHOLD", String.valueOf(value));
+        AuditLogger.log(this, "CHANGE_CONFIG", "LOW_STOCK_THRESHOLD " + oldThreshold + " -> " + value);
         System.out.println("Low-stock threshold updated.");
     }
 }

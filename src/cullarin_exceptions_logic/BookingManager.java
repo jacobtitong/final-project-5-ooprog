@@ -617,8 +617,18 @@ public class BookingManager {
             if (!InputHelper.getYesNo("Do you have a valid ID? (Y/N): ")) {
                 throw new InvalidDiscountException("A valid ID is required for this discount.");
             }
-            if (choice == 2 && !counter && calculateAge(user.getBirthdate()) < 60) {
-                throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
+            if (choice == 2) {
+                // Online: verify against the registered birthdate.
+                // Counter: cashier must confirm the customer is 60+ before applying.
+                if (!counter) {
+                    if (calculateAge(user.getBirthdate()) < 60) {
+                        throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
+                    }
+                } else {
+                    if (!InputHelper.getYesNo("Confirm the customer is 60 years old or above? (Y/N): ")) {
+                        throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
+                    }
+                }
             }
             switch (choice) {
                 case 2:
@@ -636,7 +646,7 @@ public class BookingManager {
         }
 
         if (InputHelper.getYesNo("Do you have a promo code? (Y/N): ")) {
-            String code = InputHelper.getValidName("Promo code: ", 4, 12);
+            String code = InputHelper.getValidCode("Promo code: ");
             Discount found = null;
             for (Discount d : ds.getDiscounts()) {
                 if (d.getCode().equalsIgnoreCase(code)) {
@@ -947,6 +957,24 @@ public class BookingManager {
 
     // ----- review -----
 
+    // Returns true when the user has at least one CONFIRMED booking for a
+    // showing of the given movie whose showtime is already in the past.
+    private static boolean hasPastConfirmedBookingFor(RegisteredUser u, int movieId) {
+        DataStore ds = DataStore.getInstance();
+        ArrayList<Booking> bookings = ds.loadBookings(ds.getUserBookingsPath(u.getId()));
+
+        for (Booking b : bookings) {
+            if (!b.getStatus().equals("CONFIRMED")) {
+                continue;
+            }
+            Schedule s = ds.findScheduleById(b.getScheduleId());
+            if (s != null && s.getMovieId() == movieId && !isUpcoming(s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static void submitReview(RegisteredUser u) {
         DataStore ds = DataStore.getInstance();
 
@@ -955,6 +983,10 @@ public class BookingManager {
             int movieId = InputHelper.getValidInt("Movie ID to review: ", 1, 999999);
             if (ds.findMovieById(movieId) == null) {
                 throw new InvalidInputException("Movie ID not found.");
+            }
+            if (!hasPastConfirmedBookingFor(u, movieId)) {
+                throw new InvalidInputException(
+                        "You can only review a movie after attending a confirmed showing of it.");
             }
             int rating = InputHelper.getValidInt("Rating (1-5): ", 1, 5);
             String comment = InputHelper.getValidText("Comment (up to 100 characters, press Enter to skip): ", 0, 100);
@@ -1030,6 +1062,7 @@ public class BookingManager {
             ds.saveTransactions();
             // the refund is settled, so the cancelled booking's seats can be sold again
             releaseSeats(chosen.getBookingId());
+            AuditLogger.log(cs, "PROCESS_REFUND", "txnID=" + chosen.getId() + " bookingID=" + chosen.getBookingId() + " amount=" + round2(amount));
             System.out.printf("Refund of Php %.2f recorded by %s.%n", round2(amount), cs.getName());
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
@@ -1116,6 +1149,7 @@ public class BookingManager {
 
             ds.getBulkRequests().add(new BulkBookingRequest(ds.generateId(), requester, contact, scheduleId, seatCount, "PENDING", 0));
             ds.saveBulkRequests();
+            AuditLogger.log(cs, "CREATE_BULK_REQUEST", "requester=" + requester + " scheduleID=" + scheduleId + " seats=" + seatCount);
             System.out.println("Bulk request saved as PENDING. An Admin will review it.");
         } catch (CbsException e) {
             System.out.println("Error: " + e.getMessage());
@@ -1163,6 +1197,7 @@ public class BookingManager {
                 request.setStatus("REJECTED");
                 request.setReviewerId(a.getId());
                 ds.saveBulkRequests();
+                AuditLogger.log(a, "REJECT_BULK", "requestID=" + request.getId() + " requester=" + request.getRequesterName());
                 System.out.println("Request rejected.");
             } else {
                 Schedule schedule = ds.findScheduleById(request.getScheduleId());
@@ -1209,6 +1244,7 @@ public class BookingManager {
                 request.setStatus("APPROVED");
                 request.setReviewerId(a.getId());
                 ds.saveBulkRequests();
+                AuditLogger.log(a, "APPROVE_BULK", "requestID=" + request.getId() + " booking=" + bookingRef(bookingId) + " seats=" + seats.size());
 
                 System.out.println("Request approved. Booking " + bookingRef(bookingId) + " was created.");
                 printTicket(booking);
