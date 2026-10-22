@@ -59,6 +59,36 @@ public class BookingManager {
         return Math.round(x * 100) / 100.0;
     }
 
+    // Minimum ages for each rating (G = 0 so it is always allowed)
+    private static int minimumAge(String ageRating) {
+        switch (ageRating.toUpperCase()) {
+            case "PG":  return 13;
+            case "R13": return 13;
+            case "R16": return 16;
+            case "R18": return 18;
+            default:    return 0;  // G or unknown -- no restriction
+        }
+    }
+
+    /**
+     * Throws AgeRestrictionException when the registered user is too young
+     * for the movie's age rating.  Counter bookings skip this check because
+     * the cashier is responsible for verifying a physical ID on the spot.
+     */
+    public static void checkAgeRating(RegisteredUser user, Movie movie)
+            throws AgeRestrictionException {
+        int required = minimumAge(movie.getAgeRating());
+        if (required > 0) {
+            int userAge = calculateAge(user.getBirthdate());
+            if (userAge < required) {
+                throw new AgeRestrictionException(
+                        "You must be at least " + required + " years old to book \""
+                        + movie.getTitle() + "\" (" + movie.getAgeRating() + "). "
+                        + "Your registered age is " + userAge + ".");
+            }
+        }
+    }
+
     public static int calculateAge(String birthdate) {
         String[] born = birthdate.split("-");
         String[] now = today().split("-");
@@ -322,6 +352,12 @@ public class BookingManager {
             if (movie == null) {
                 throw new InvalidInputException("Movie ID not found.");
             }
+
+            // age-rating enforcement (online only; cashier checks ID at counter)
+            if (!counter) {
+                checkAgeRating(user, movie);
+            }
+
             ArrayList<Schedule> upcoming = upcomingSchedulesOf(movieId);
             if (upcoming.size() == 0) {
                 throw new InvalidInputException("This movie has no upcoming showings.");
