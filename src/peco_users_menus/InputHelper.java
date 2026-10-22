@@ -95,8 +95,8 @@ public class InputHelper {
                     if (input.length() < minLen || input.length() > maxLen) {
                         throw new InvalidInputException("Must be " + minLen + "-" + maxLen + " characters long.");
                     }
-                    if (!input.matches("[A-Za-z0-9 .,!?-]+")) {
-                        throw new InvalidInputException("Only letters, digits, spaces and . , ! ? - are allowed.");
+                    if (!input.matches("[A-Za-z0-9 .,!?'\":;()\\[\\]@#&*/_+=%-]+")) {
+                        throw new InvalidInputException("Only letters, digits, spaces and common punctuation are allowed (no semicolons).");
                     }
                     isValid = true;
                 }
