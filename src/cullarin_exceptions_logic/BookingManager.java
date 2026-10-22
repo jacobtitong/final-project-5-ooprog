@@ -646,7 +646,7 @@ public class BookingManager {
         }
 
         if (InputHelper.getYesNo("Do you have a promo code? (Y/N): ")) {
-            String code = InputHelper.getValidName("Promo code: ", 4, 12);
+            String code = InputHelper.getValidCode("Promo code: ");
             Discount found = null;
             for (Discount d : ds.getDiscounts()) {
                 if (d.getCode().equalsIgnoreCase(code)) {
