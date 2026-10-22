@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 public class DataStore {
-    private static DataStore instance;
+    private static volatile DataStore instance;
 
     private ArrayList<User> users = new ArrayList<>();
     private ArrayList<Movie> movies = new ArrayList<>();
@@ -48,9 +48,13 @@ public class DataStore {
         loadAll();
     }
 
-    public static DataStore getInstance() {
+    public static synchronized DataStore getInstance() {
         if (instance == null) {
-            instance = new DataStore();
+            synchronized (DataStore.class) {
+                if (instance == null) {
+                    instance = new DataStore();
+                }
+            }
         }
         return instance;
     }

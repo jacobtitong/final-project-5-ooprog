@@ -320,20 +320,26 @@ public class Admin extends User {
         }
     }
 
-    // returns true when any schedule in this hall has at least one confirmed
-    // booking in the seat ledger
-    private boolean hallHasBookings(int hallId) {
+    // returns the first booked seat (in any showing of this hall) that would no
+    // longer exist in a hall of newRows x newColumns, or null when the resize is
+    // safe. Seat codes are a row letter + column number, for example A10.
+    private String findSeatOutsideSize(int hallId, int newRows, int newColumns) {
         DataStore ds = DataStore.getInstance();
         for (Schedule s : ds.getSchedules()) {
             if (s.getHallId() == hallId) {
                 for (SeatLedgerEntry e : ds.getLedger()) {
                     if (e.getScheduleId() == s.getId()) {
-                        return true;
+                        String code = e.getSeatCode();
+                        int row = code.charAt(0) - 'A';
+                        int column = Integer.parseInt(code.substring(1));
+                        if (row >= newRows || column > newColumns) {
+                            return code;
+                        }
                     }
                 }
             }
         }
-        return false;
+        return null;
     }
 
     private void editHall() {
@@ -369,19 +375,25 @@ public class Admin extends User {
                         }
                         break;
                     case 3:
-                        if (hallHasBookings(h.getId())) {
-                            System.out.println("Error: Cannot change rows — this hall has confirmed bookings.");
+                        int newRows = InputHelper.getValidInt("New rows (3-12): ", 3, 12);
+                        String lostRowSeat = findSeatOutsideSize(h.getId(), newRows, h.getColumns());
+                        if (lostRowSeat != null) {
+                            System.out.println("Error: Cannot change rows - booked seat " + lostRowSeat
+                                    + " would no longer exist in this hall.");
                         } else {
-                            h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
+                            h.setRows(newRows);
                             ds.saveHalls();
                             System.out.println("Rows updated.");
                         }
                         break;
                     case 4:
-                        if (hallHasBookings(h.getId())) {
-                            System.out.println("Error: Cannot change columns — this hall has confirmed bookings.");
+                        int newColumns = InputHelper.getValidInt("New columns (4-20): ", 4, 20);
+                        String lostColumnSeat = findSeatOutsideSize(h.getId(), h.getRows(), newColumns);
+                        if (lostColumnSeat != null) {
+                            System.out.println("Error: Cannot change columns - booked seat " + lostColumnSeat
+                                    + " would no longer exist in this hall.");
                         } else {
-                            h.setColumns(InputHelper.getValidInt("New columns (4-20): ", 4, 20));
+                            h.setColumns(newColumns);
                             ds.saveHalls();
                             System.out.println("Columns updated.");
                         }
@@ -476,12 +488,15 @@ public class Admin extends User {
             Movie m = chooseMovie();
             listHalls();
             Hall h = chooseHall();
-            String date = InputHelper.getValidDate("Date (YYYY-MM-DD): ");
+            String date = getValidFutureDate("Date (YYYY-MM-DD): ");
             String startTime = InputHelper.getValidTime("Start time (HH:MM, 24-hour): ");
             String format = chooseFormat();
             double price = InputHelper.getValidDouble("Ticket price (50.00-1000.00): ", 50, 1000);
 
             Schedule test = new Schedule(0, m.getId(), h.getId(), date, startTime, format, price);
+            if (!Guest.isUpcoming(test)) {
+                throw new InvalidInputException("Schedule cannot be in the past.");
+            }
             BookingManager.checkScheduleConflict(test, 0);
 
             ds.getSchedules().add(new Schedule(ds.generateId(), m.getId(), h.getId(), date, startTime, format, price));
@@ -534,7 +549,7 @@ public class Admin extends User {
             listHalls();
             hallId = chooseHall().getId();
         } else if (field == 3) {
-            date = InputHelper.getValidDate("New date (YYYY-MM-DD): ");
+            date = getValidFutureDate("New date (YYYY-MM-DD): ");
         } else if (field == 4) {
             startTime = InputHelper.getValidTime("New start time (HH:MM): ");
         } else if (field == 5) {
@@ -544,6 +559,9 @@ public class Admin extends User {
         }
 
         Schedule test = new Schedule(s.getId(), movieId, hallId, date, startTime, format, price);
+        if (!Guest.isUpcoming(test)) {
+            throw new InvalidInputException("Schedule cannot be in the past.");
+        }
         BookingManager.checkScheduleConflict(test, s.getId());
 
         s.setMovieId(movieId);
@@ -780,8 +798,8 @@ public class Admin extends User {
         boolean back = false;
         while (!back) {
             System.out.print("\n=== MANAGE USER ACCOUNTS ===");
-            System.out.print("\n1 - List registered users\n2 - Deactivate a user\n3 - Back\n");
-            int option = InputHelper.getValidInt("--> Option: ", 1, 3);
+            System.out.print("\n1 - List registered users\n2 - Deactivate a user\n3 - Reactivate a user\n4 - Back\n");
+            int option = InputHelper.getValidInt("--> Option: ", 1, 4);
 
             switch (option) {
                 case 1:
@@ -791,10 +809,13 @@ public class Admin extends User {
                     deactivateUser();
                     break;
                 case 3:
+                    reactivateUser();
+                    break;
+                case 4:
                     back = true;
                     break;
                 default:
-                    System.out.println("Error: Invalid option. Please choose 1-3.");
+                    System.out.println("Error: Invalid option. Please choose 1-4.");
             }
         }
     }
@@ -842,6 +863,34 @@ public class Admin extends User {
                 found.setActive(false);
                 ds.saveUsers();
                 System.out.println("Account deactivated.");
+            }
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    private void reactivateUser() {
+        DataStore ds = DataStore.getInstance();
+
+        try {
+            listUsers();
+            int id = InputHelper.getValidInt("User ID to reactivate: ", 1, 999999);
+            User found = null;
+            for (User u : ds.getUsers()) {
+                if (u instanceof RegisteredUser && u.getId() == id) {
+                    found = u;
+                }
+            }
+            if (found == null) {
+                throw new InvalidInputException("Registered user ID not found.");
+            }
+            if (found.isActive()) {
+                throw new InvalidInputException("That account is already active.");
+            }
+            if (InputHelper.getYesNo("Reactivate " + found.getName() + "? (Y/N): ")) {
+                found.setActive(true);
+                ds.saveUsers();
+                System.out.println("Account reactivated.");
             }
         } catch (InvalidInputException e) {
             System.out.println("Error: " + e.getMessage());
