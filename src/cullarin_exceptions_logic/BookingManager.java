@@ -617,8 +617,18 @@ public class BookingManager {
             if (!InputHelper.getYesNo("Do you have a valid ID? (Y/N): ")) {
                 throw new InvalidDiscountException("A valid ID is required for this discount.");
             }
-            if (choice == 2 && !counter && calculateAge(user.getBirthdate()) < 60) {
-                throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
+            if (choice == 2) {
+                // Online: verify against the registered birthdate.
+                // Counter: cashier must confirm the customer is 60+ before applying.
+                if (!counter) {
+                    if (calculateAge(user.getBirthdate()) < 60) {
+                        throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
+                    }
+                } else {
+                    if (!InputHelper.getYesNo("Confirm the customer is 60 years old or above? (Y/N): ")) {
+                        throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
+                    }
+                }
             }
             switch (choice) {
                 case 2:
