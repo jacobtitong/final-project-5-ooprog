@@ -320,20 +320,26 @@ public class Admin extends User {
         }
     }
 
-    // returns true when any schedule in this hall has at least one confirmed
-    // booking in the seat ledger
-    private boolean hallHasBookings(int hallId) {
+    // returns the first booked seat (in any showing of this hall) that would no
+    // longer exist in a hall of newRows x newColumns, or null when the resize is
+    // safe. Seat codes are a row letter + column number, for example A10.
+    private String findSeatOutsideSize(int hallId, int newRows, int newColumns) {
         DataStore ds = DataStore.getInstance();
         for (Schedule s : ds.getSchedules()) {
             if (s.getHallId() == hallId) {
                 for (SeatLedgerEntry e : ds.getLedger()) {
                     if (e.getScheduleId() == s.getId()) {
-                        return true;
+                        String code = e.getSeatCode();
+                        int row = code.charAt(0) - 'A';
+                        int column = Integer.parseInt(code.substring(1));
+                        if (row >= newRows || column > newColumns) {
+                            return code;
+                        }
                     }
                 }
             }
         }
-        return false;
+        return null;
     }
 
     private void editHall() {
@@ -369,19 +375,25 @@ public class Admin extends User {
                         }
                         break;
                     case 3:
-                        if (hallHasBookings(h.getId())) {
-                            System.out.println("Error: Cannot change rows — this hall has confirmed bookings.");
+                        int newRows = InputHelper.getValidInt("New rows (3-12): ", 3, 12);
+                        String lostRowSeat = findSeatOutsideSize(h.getId(), newRows, h.getColumns());
+                        if (lostRowSeat != null) {
+                            System.out.println("Error: Cannot change rows - booked seat " + lostRowSeat
+                                    + " would no longer exist in this hall.");
                         } else {
-                            h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
+                            h.setRows(newRows);
                             ds.saveHalls();
                             System.out.println("Rows updated.");
                         }
                         break;
                     case 4:
-                        if (hallHasBookings(h.getId())) {
-                            System.out.println("Error: Cannot change columns — this hall has confirmed bookings.");
+                        int newColumns = InputHelper.getValidInt("New columns (4-20): ", 4, 20);
+                        String lostColumnSeat = findSeatOutsideSize(h.getId(), h.getRows(), newColumns);
+                        if (lostColumnSeat != null) {
+                            System.out.println("Error: Cannot change columns - booked seat " + lostColumnSeat
+                                    + " would no longer exist in this hall.");
                         } else {
-                            h.setColumns(InputHelper.getValidInt("New columns (4-20): ", 4, 20));
+                            h.setColumns(newColumns);
                             ds.saveHalls();
                             System.out.println("Columns updated.");
                         }
