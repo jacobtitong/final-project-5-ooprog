@@ -1,3 +1,5 @@
+package mendoza_strategy;
+
 public class BulkDiscount implements DiscountStrategy {
     private double rate;
 

@@ -1,3 +1,6 @@
+package mendoza_strategy;
+import cullarin_exceptions_logic.PaymentFailedException;
+
 public class EWalletPayment implements PaymentStrategy {
     @Override
     public void pay(double amount, String accountNumber) throws PaymentFailedException {
