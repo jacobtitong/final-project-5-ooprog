@@ -143,6 +143,28 @@ public class BookingManager {
         ds.saveLedger();
     }
 
+    // restores snack stock and removes snack orders for a cancelled booking
+    private static void restoreSnackStock(int bookingId) {
+        DataStore ds = DataStore.getInstance();
+        boolean changed = false;
+
+        for (int i = ds.getSnackOrders().size() - 1; i >= 0; i--) {
+            SnackOrder order = ds.getSnackOrders().get(i);
+            if (order.getBookingId() == bookingId) {
+                Snack snack = ds.findSnackById(order.getSnackId());
+                if (snack != null) {
+                    snack.setStock(snack.getStock() + order.getQuantity());
+                }
+                ds.getSnackOrders().remove(i);
+                changed = true;
+            }
+        }
+        if (changed) {
+            ds.saveSnacks();
+            ds.saveSnackOrders();
+        }
+    }
+
     private static String bookingRef(int id) {
         return "BK-" + String.format("%06d", id);
     }
@@ -924,17 +946,17 @@ public class BookingManager {
                 chosen.setStatus("CANCELLED");
                 ds.saveBookings(path, bookings);
 
-                // the seats stay reserved in the ledger until Customer Service processes
-                // the refund (see processRefund), so nobody can rebook them before then
+                // Release seats and restore snack inventory immediately so other customers
+                // can purchase them while the refund is pending Customer Service approval
+                releaseSeats(chosen.getId());
+                restoreSnackStock(chosen.getId());
+
                 Transaction t = findTransaction(chosen.getId());
                 if (t != null) {
                     t.setStatus("REFUND_PENDING");
                     ds.saveTransactions();
-                    System.out.println("Booking cancelled. Your refund is now waiting for Customer Service.");
-                    System.out.println("Your seats stay reserved until the refund is processed.");
+                    System.out.println("Booking cancelled. Your seats have been released and your refund is now waiting for Customer Service.");
                 } else {
-                    // no payment record means there is no refund to wait for
-                    releaseSeats(chosen.getId());
                     System.out.println("Booking cancelled.");
                 }
             }
@@ -1096,8 +1118,9 @@ public class BookingManager {
             chosen.setRefundAmount(round2(amount));
             chosen.setStatus("REFUNDED");
             ds.saveTransactions();
-            // the refund is settled, so the cancelled booking's seats can be sold again
+            // Ensure any seats or snack orders still attached to this booking are released/restored
             releaseSeats(chosen.getBookingId());
+            restoreSnackStock(chosen.getBookingId());
             AuditLogger.log(cs, "PROCESS_REFUND", "txnID=" + chosen.getId() + " bookingID=" + chosen.getBookingId() + " amount=" + round2(amount));
             System.out.printf("Refund of Php %.2f recorded by %s.%n", round2(amount), cs.getName());
         } catch (CbsException e) {
@@ -1250,8 +1273,9 @@ public class BookingManager {
                 DiscountStrategy discount = new BulkDiscount(request.getSeatCount());
                 double total = discount.apply(subtotal);
 
+                int pct = request.getSeatCount() >= 50 ? 15 : 10;
                 System.out.printf("\nBulk tickets (%d seats): Php %.2f%n", seats.size(), subtotal);
-                System.out.printf("Bulk discount (15%%): -Php %.2f%n", round2(subtotal - total));
+                System.out.printf("Bulk discount (%d%%): -Php %.2f%n", pct, round2(subtotal - total));
                 System.out.printf("TOTAL DUE: Php %.2f%n", total);
 
                 String method = takePayment(total, true, WALK_IN_USER);

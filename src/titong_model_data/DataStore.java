@@ -78,6 +78,15 @@ public class DataStore {
         loadReviews();
     }
 
+    // reads the next line of a data file, skipping blank lines (for example a trailing empty line)
+    private String readDataLine(BufferedReader br) throws IOException {
+        String line = br.readLine();
+        while (line != null && line.trim().equals("")) {
+            line = br.readLine();
+        }
+        return line;
+    }
+
     // -------------------------------------------------------------------------
     // Stale-data detection helpers
     // -------------------------------------------------------------------------
@@ -278,11 +287,11 @@ public class DataStore {
         } else {
             try {
                 BufferedReader br = new BufferedReader(new FileReader(FILE_CONFIG));
-                String line = br.readLine();
+                String line = readDataLine(br);
                 while (line != null) {
                     String[] p = line.split(";");
                     configs.add(new SystemConfig(p[0], p[1]));
-                    line = br.readLine();
+                    line = readDataLine(br);
                 }
                 br.close();
             } catch (IOException e) {
@@ -317,7 +326,7 @@ public class DataStore {
         } else {
             try {
                 BufferedReader br = new BufferedReader(new FileReader(FILE_USERS));
-                String line = br.readLine();
+                String line = readDataLine(br);
                 while (line != null) {
                     String[] p = line.split(";");
                     int id = Integer.parseInt(p[0]);
@@ -334,7 +343,7 @@ public class DataStore {
                     } else if (role.equals("ADMIN")) {
                         users.add(new Admin(id, p[2], p[3], p[4], active));
                     }
-                    line = br.readLine();
+                    line = readDataLine(br);
                 }
                 br.close();
             } catch (IOException e) {
@@ -385,13 +394,13 @@ public class DataStore {
     private void loadMovies() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_MOVIES));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 movies.add(new Movie(Integer.parseInt(p[0]), p[1], p[2],
                         p[3], p[4], p[5],
                         Integer.parseInt(p[6])));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -417,12 +426,12 @@ public class DataStore {
     private void loadHalls() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_HALLS));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 halls.add(new Hall(Integer.parseInt(p[0]), p[1], p[2],
                         Integer.parseInt(p[3]), Integer.parseInt(p[4])));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -448,13 +457,13 @@ public class DataStore {
     private void loadSchedules() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_SCHEDULES));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 schedules.add(new Schedule(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]),
                         p[3], p[4], p[5],
                         Double.parseDouble(p[6])));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -480,11 +489,11 @@ public class DataStore {
     private void loadLedger() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_LEDGER));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 ledger.add(new SeatLedgerEntry(Integer.parseInt(p[0]), p[1], Integer.parseInt(p[2])));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -510,7 +519,7 @@ public class DataStore {
     private void loadTransactions() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_TRANSACTIONS));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 transactions.add(new Transaction(Integer.parseInt(p[0]), Integer.parseInt(p[1]), p[2],
@@ -518,7 +527,7 @@ public class DataStore {
                         Double.parseDouble(p[6]), Double.parseDouble(p[7]), Double.parseDouble(p[8]),
                         p[9], p[10], Double.parseDouble(p[11]),
                         p[12]));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -544,12 +553,12 @@ public class DataStore {
     private void loadSnacks() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_SNACKS));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 snacks.add(new Snack(Integer.parseInt(p[0]), p[1], Double.parseDouble(p[2]),
                         Integer.parseInt(p[3]), p[4].equals("true")));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -575,12 +584,12 @@ public class DataStore {
     private void loadSnackOrders() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_SNACK_ORDERS));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 snackOrders.add(new SnackOrder(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]),
                         Integer.parseInt(p[3]), Double.parseDouble(p[4])));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -606,12 +615,12 @@ public class DataStore {
     private void loadDiscounts() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_DISCOUNTS));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 discounts.add(new Discount(p[0], p[1], Double.parseDouble(p[2]),
                         p[3].equals("true"), p[4], p[5].equals("true")));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -637,13 +646,13 @@ public class DataStore {
     private void loadBulkRequests() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_BULK));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 bulkRequests.add(new BulkBookingRequest(Integer.parseInt(p[0]), p[1], p[2],
                         Integer.parseInt(p[3]), Integer.parseInt(p[4]), p[5],
                         Integer.parseInt(p[6])));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -669,12 +678,12 @@ public class DataStore {
     private void loadReviews() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(FILE_REVIEWS));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 reviews.add(new Review(Integer.parseInt(p[0]), Integer.parseInt(p[1]), Integer.parseInt(p[2]),
                         Integer.parseInt(p[3]), p[4], p[5]));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -718,13 +727,13 @@ public class DataStore {
         ArrayList<Booking> list = new ArrayList<>();
         try {
             BufferedReader br = new BufferedReader(new FileReader(path));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split(";");
                 list.add(new Booking(Integer.parseInt(p[0]), p[1], Integer.parseInt(p[2]),
                         p[3], Integer.parseInt(p[4]), p[5],
                         p[6], Double.parseDouble(p[7]), p[8]));
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (IOException e) {
@@ -802,13 +811,13 @@ public class DataStore {
     private void loadAuditLog() {
         try {
             java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(FILE_AUDIT));
-            String line = br.readLine();
+            String line = readDataLine(br);
             while (line != null) {
                 String[] p = line.split("\\|", 6);
                 if (p.length == 6) {
                     auditLog.add(new AuditLog(p[0], p[1], Integer.parseInt(p[2]), p[3], p[4], p[5]));
                 }
-                line = br.readLine();
+                line = readDataLine(br);
             }
             br.close();
         } catch (java.io.IOException e) {

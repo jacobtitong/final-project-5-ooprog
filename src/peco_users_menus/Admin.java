@@ -578,7 +578,7 @@ public class Admin extends User {
         }
 
         Schedule test = new Schedule(s.getId(), movieId, hallId, date, startTime, format, price);
-        if (!Guest.isUpcoming(test)) {
+        if ((field == 3 || field == 4 || Guest.isUpcoming(s)) && !Guest.isUpcoming(test)) {
             throw new InvalidInputException("Schedule cannot be in the past.");
         }
         BookingManager.checkScheduleConflict(test, s.getId());
