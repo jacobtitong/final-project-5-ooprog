@@ -37,8 +37,11 @@ public class ReportManager {
 
             double totalRevenue = 0;
             // Refund tracking (for REFUNDED transactions inside the range)
-            int    refundCount  = 0;
-            double totalRefunds = 0;
+            int    refundCount        = 0;
+            double totalRefunds       = 0;
+            // Pending-refund tracking (REFUND_PENDING - cancelled but not yet processed)
+            int    pendingRefundCount  = 0;
+            double totalPendingRefunds = 0;
 
             ArrayList<Integer> movieIds     = new ArrayList<>();
             ArrayList<Integer> movieTickets = new ArrayList<>();
@@ -68,6 +71,9 @@ public class ReportManager {
                 } else if (isRefunded(t, start, end)) {
                     refundCount++;
                     totalRefunds += t.getRefundAmount();
+                } else if (isPendingRefund(t, start, end)) {
+                    pendingRefundCount++;
+                    totalPendingRefunds += t.getTotalAmount();
                 }
             }
 
@@ -91,20 +97,26 @@ public class ReportManager {
             // Print report header
             // ----------------------------------------------------------------
             System.out.println("\n=== REVENUE REPORT: " + start + " to " + end + " ===");
-            System.out.printf("Total revenue : Php %.2f%n", BookingManager.round2(totalRevenue));
+            System.out.printf("Gross revenue  : Php %.2f%n", BookingManager.round2(totalRevenue));
 
             // ----------------------------------------------------------------
             // Refund summary
             // ----------------------------------------------------------------
             System.out.println("\n--- Refund summary ---");
-            if (refundCount == 0) {
-                System.out.println("No refunds issued in this period.");
+            double netRevenue = BookingManager.round2(totalRevenue - totalRefunds);
+            if (refundCount == 0 && pendingRefundCount == 0) {
+                System.out.println("No refunds in this period.");
             } else {
-                System.out.printf("Refunds issued : %d%n", refundCount);
-                System.out.printf("Total refunded : Php %.2f%n", BookingManager.round2(totalRefunds));
-                System.out.printf("Net revenue    : Php %.2f%n",
-                    BookingManager.round2(totalRevenue - totalRefunds));
+                if (refundCount > 0) {
+                    System.out.printf("Refunds processed : %d%n", refundCount);
+                    System.out.printf("Total refunded    : Php %.2f%n", BookingManager.round2(totalRefunds));
+                }
+                if (pendingRefundCount > 0) {
+                    System.out.printf("Refunds pending   : %d  (Php %.2f - awaiting CS approval)%n",
+                        pendingRefundCount, BookingManager.round2(totalPendingRefunds));
+                }
             }
+            System.out.printf("Net revenue       : Php %.2f%n", netRevenue);
 
             // ----------------------------------------------------------------
             // Revenue by movie (paginated)
@@ -180,6 +192,15 @@ public class ReportManager {
     /** Returns true for REFUNDED transactions whose date falls in [start, end]. */
     private static boolean isRefunded(Transaction t, String start, String end) {
         if (t.getStatus().equals("REFUNDED") && t.getTimestamp().length() >= 10) {
+            String date = t.getTimestamp().substring(0, 10);
+            return date.compareTo(start) >= 0 && date.compareTo(end) <= 0;
+        }
+        return false;
+    }
+
+    /** Returns true for REFUND_PENDING transactions whose date falls in [start, end]. */
+    private static boolean isPendingRefund(Transaction t, String start, String end) {
+        if (t.getStatus().equals("REFUND_PENDING") && t.getTimestamp().length() >= 10) {
             String date = t.getTimestamp().substring(0, 10);
             return date.compareTo(start) >= 0 && date.compareTo(end) <= 0;
         }
