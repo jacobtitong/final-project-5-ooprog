@@ -183,10 +183,44 @@ public class DataStore {
     }
 
     // ids and system config
+
+    /**
+     * Reserves a single unique ID and persists the new counter immediately.
+     * Use this only for standalone, single-record operations (e.g. adding a
+     * movie, hall, or schedule) where exactly one ID is needed and the record
+     * is written to disk in the same statement.
+     */
     public int generateId() {
-        int id = getConfigInt("NEXT_ID");
-        setConfig("NEXT_ID", String.valueOf(id + 1));
-        return id;
+        return generateIdBlock(1)[0];
+    }
+
+    /**
+     * Reserves a contiguous block of {@code count} unique IDs and persists
+     * the updated counter to disk exactly once for the whole block.
+     *
+     * Callers that need several IDs in one logical operation (e.g. a booking
+     * that requires a bookingId, a transactionId, and N snack-order IDs)
+     * should call this method once before writing anything.  That way a crash
+     * between writes can only leave the ID counter slightly ahead of the
+     * highest-used ID -- it cannot produce a duplicate ID, because the full
+     * range is committed to disk before any record is written.
+     *
+     * @param count number of consecutive IDs required (must be >= 1)
+     * @return int[] of length {@code count} with consecutive IDs starting at
+     *         the old NEXT_ID value
+     */
+    public int[] generateIdBlock(int count) {
+        if (count < 1) {
+            count = 1;
+        }
+        int first = getConfigInt("NEXT_ID");
+        // Persist the new ceiling in a single write before any record is saved.
+        setConfig("NEXT_ID", String.valueOf(first + count));
+        int[] ids = new int[count];
+        for (int i = 0; i < count; i++) {
+            ids[i] = first + i;
+        }
+        return ids;
     }
 
     public int getConfigInt(String key) {
