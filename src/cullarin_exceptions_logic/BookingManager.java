@@ -77,8 +77,14 @@ public class BookingManager {
      */
     public static void checkAgeRating(RegisteredUser user, Movie movie)
             throws AgeRestrictionException {
+        if (user == null || movie == null) {
+            return;
+        }
         int required = minimumAge(movie.getAgeRating());
         if (required > 0) {
+            if (user.getBirthdate() == null || user.getBirthdate().isEmpty()) {
+                return;
+            }
             int userAge = calculateAge(user.getBirthdate());
             if (userAge < required) {
                 throw new AgeRestrictionException(
@@ -326,19 +332,31 @@ public class BookingManager {
 
     // ----- booking (online and counter share bookTickets) -----
 
+    // Sentinel user object for walk-in counter bookings so downstream methods never receive null
+    public static final RegisteredUser WALK_IN_USER = new RegisteredUser(
+            0, "Walk-in", "counter@cinema.local", "none", true, "2000-01-01", "none", "none"
+    );
+
     public static void bookOnline(RegisteredUser u) {
+        if (u == null) {
+            System.out.println("Error: Online booking requires a registered user account.");
+            return;
+        }
         bookTickets(false, u);
     }
 
     private static void bookTickets(boolean counter, RegisteredUser user) {
         DataStore ds = DataStore.getInstance();
+        if (user == null) {
+            user = WALK_IN_USER;
+        }
 
         try {
             String ownerType = "GUEST";
             int ownerId = 0;
             String customerName = "Walk-in";
             String path = ds.getCounterBookingsPath();
-            if (!counter) {
+            if (!counter && user.getId() != 0) {
                 ownerType = "REGISTERED_USER";
                 ownerId = user.getId();
                 customerName = user.getName();
@@ -354,7 +372,7 @@ public class BookingManager {
             }
 
             // age-rating enforcement (online only; cashier checks ID at counter)
-            if (!counter) {
+            if (!counter && user.getId() != 0) {
                 checkAgeRating(user, movie);
             }
 
@@ -375,7 +393,7 @@ public class BookingManager {
             }
 
             // 2. overlap check (registered users only)
-            if (!counter) {
+            if (!counter && user.getId() != 0) {
                 checkOverlap(user.getId(), schedule);
             }
 
@@ -621,7 +639,7 @@ public class BookingManager {
                 // Online: verify against the registered birthdate.
                 // Counter: cashier must confirm the customer is 60+ before applying.
                 if (!counter) {
-                    if (calculateAge(user.getBirthdate()) < 60) {
+                    if (user == null || user.getId() == 0 || user.getBirthdate() == null || calculateAge(user.getBirthdate()) < 60) {
                         throw new InvalidDiscountException("The Senior discount is only for age 60 and above.");
                     }
                 } else {
@@ -686,11 +704,14 @@ public class BookingManager {
 
     // returns the payment method (CREDIT, DEBIT, EWALLET, CASH), or "" if the user gave up
     private static String takePayment(double total, boolean counter, RegisteredUser user) {
+        if (user == null) {
+            user = WALK_IN_USER;
+        }
         int choice = 0;
         boolean useSaved = false;
         String accountNumber = "none";
 
-        if (!counter && !user.getSavedPaymentType().equals("none")) {
+        if (!counter && user.getId() != 0 && user.getSavedPaymentType() != null && !user.getSavedPaymentType().equals("none")) {
             if (InputHelper.getYesNo("Use your saved " + user.getSavedPaymentType() + " account? (Y/N): ")) {
                 useSaved = true;
                 accountNumber = user.getSavedPaymentNumber();
@@ -846,6 +867,10 @@ public class BookingManager {
     }
 
     public static void cancelBooking(RegisteredUser u) {
+        if (u == null) {
+            System.out.println("Error: Cancel booking requires a registered user.");
+            return;
+        }
         DataStore ds = DataStore.getInstance();
 
         try {
@@ -919,6 +944,10 @@ public class BookingManager {
     }
 
     public static void showBookingHistory(RegisteredUser u) {
+        if (u == null) {
+            System.out.println("Error: Show booking history requires a registered user.");
+            return;
+        }
         DataStore ds = DataStore.getInstance();
 
         System.out.println("\n--- BOOKING HISTORY: " + u.getName() + " ---");
@@ -960,6 +989,9 @@ public class BookingManager {
     // Returns true when the user has at least one CONFIRMED booking for a
     // showing of the given movie whose showtime is already in the past.
     private static boolean hasPastConfirmedBookingFor(RegisteredUser u, int movieId) {
+        if (u == null) {
+            return false;
+        }
         DataStore ds = DataStore.getInstance();
         ArrayList<Booking> bookings = ds.loadBookings(ds.getUserBookingsPath(u.getId()));
 
@@ -976,6 +1008,10 @@ public class BookingManager {
     }
 
     public static void submitReview(RegisteredUser u) {
+        if (u == null) {
+            System.out.println("Error: Submit review requires a registered user.");
+            return;
+        }
         DataStore ds = DataStore.getInstance();
 
         try {
@@ -1092,7 +1128,7 @@ public class BookingManager {
     // ----- counter booking -----
 
     public static void bookAtCounter(Cashier c) {
-        bookTickets(true, null);
+        bookTickets(true, WALK_IN_USER);
     }
 
     // ----- bulk requests -----
@@ -1218,7 +1254,7 @@ public class BookingManager {
                 System.out.printf("Bulk discount (15%%): -Php %.2f%n", round2(subtotal - total));
                 System.out.printf("TOTAL DUE: Php %.2f%n", total);
 
-                String method = takePayment(total, true, null);
+                String method = takePayment(total, true, WALK_IN_USER);
                 if (method.equals("")) {
                     System.out.println("Payment cancelled. Request stays PENDING.");
                     return;
