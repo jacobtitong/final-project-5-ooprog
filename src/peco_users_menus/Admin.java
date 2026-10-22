@@ -91,6 +91,21 @@ public class Admin extends User {
         }
     }
 
+    // returns true when another movie (other than skipId) already has the same
+    // title (case-insensitive)
+    private boolean movieTitleExists(String title, int skipId) {
+        DataStore ds = DataStore.getInstance();
+        for (Movie m : ds.getMovies()) {
+            if (m.getId() == skipId) {
+                continue;
+            }
+            if (m.getTitle().equalsIgnoreCase(title)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Movie chooseMovie() throws InvalidInputException {
         DataStore ds = DataStore.getInstance();
 
@@ -113,16 +128,23 @@ public class Admin extends User {
     private void addMovie() {
         DataStore ds = DataStore.getInstance();
 
-        String title = InputHelper.getValidName("Title (1-40 letters, digits, spaces): ", 1, 40);
-        String genre = InputHelper.getValidName("Genre (letters, digits, spaces): ", 2, 20);
-        String language = InputHelper.getValidName("Language: ", 2, 20);
-        String ageRating = chooseAgeRating();
-        String synopsis = InputHelper.getValidText("Synopsis (up to 200 characters): ", 1, 200);
-        int duration = InputHelper.getValidInt("Duration in minutes (30-300): ", 30, 300);
+        try {
+            String title = InputHelper.getValidName("Title (1-40 letters, digits, spaces): ", 1, 40);
+            if (movieTitleExists(title, -1)) {
+                throw new InvalidInputException("A movie titled \"" + title + "\" already exists.");
+            }
+            String genre = InputHelper.getValidName("Genre (letters, digits, spaces): ", 2, 20);
+            String language = InputHelper.getValidName("Language: ", 2, 20);
+            String ageRating = chooseAgeRating();
+            String synopsis = InputHelper.getValidText("Synopsis (up to 200 characters): ", 1, 200);
+            int duration = InputHelper.getValidInt("Duration in minutes (30-300): ", 30, 300);
 
-        ds.getMovies().add(new Movie(ds.generateId(), title, genre, language, ageRating, synopsis, duration));
-        ds.saveMovies();
-        System.out.println("Movie added.");
+            ds.getMovies().add(new Movie(ds.generateId(), title, genre, language, ageRating, synopsis, duration));
+            ds.saveMovies();
+            System.out.println("Movie added.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
     }
 
     private void editMovie() {
@@ -138,9 +160,14 @@ public class Admin extends User {
 
                 switch (option) {
                     case 1:
-                        m.setTitle(InputHelper.getValidName("New title (1-40): ", 1, 40));
-                        ds.saveMovies();
-                        System.out.println("Title updated.");
+                        String newTitle = InputHelper.getValidName("New title (1-40): ", 1, 40);
+                        if (movieTitleExists(newTitle, m.getId())) {
+                            System.out.println("Error: A movie titled \"" + newTitle + "\" already exists.");
+                        } else {
+                            m.setTitle(newTitle);
+                            ds.saveMovies();
+                            System.out.println("Title updated.");
+                        }
                         break;
                     case 2:
                         m.setGenre(InputHelper.getValidName("New genre: ", 2, 20));
@@ -241,6 +268,22 @@ public class Admin extends User {
         return h;
     }
 
+    // returns true when another hall (other than skipId) already has the same
+    // cinema location + hall name combination (case-insensitive)
+    private boolean hallNameExists(String location, String hallName, int skipId) {
+        DataStore ds = DataStore.getInstance();
+        for (Hall h : ds.getHalls()) {
+            if (h.getId() == skipId) {
+                continue;
+            }
+            if (h.getCinemaLocation().equalsIgnoreCase(location)
+                    && h.getHallName().equalsIgnoreCase(hallName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private void listHalls() {
         DataStore ds = DataStore.getInstance();
 
@@ -260,14 +303,37 @@ public class Admin extends User {
     private void addHall() {
         DataStore ds = DataStore.getInstance();
 
-        String location = InputHelper.getValidName("Cinema location (2-30 letters, digits, spaces): ", 2, 30);
-        String hallName = InputHelper.getValidName("Hall name (2-30 letters, digits, spaces): ", 2, 30);
-        int rows = InputHelper.getValidInt("Rows (3-12): ", 3, 12);
-        int columns = InputHelper.getValidInt("Columns (4-20): ", 4, 20);
+        try {
+            String location = InputHelper.getValidName("Cinema location (2-30 letters, digits, spaces): ", 2, 30);
+            String hallName = InputHelper.getValidName("Hall name (2-30 letters, digits, spaces): ", 2, 30);
+            if (hallNameExists(location, hallName, -1)) {
+                throw new InvalidInputException("A hall named \"" + hallName + "\" already exists at that cinema location.");
+            }
+            int rows = InputHelper.getValidInt("Rows (3-12): ", 3, 12);
+            int columns = InputHelper.getValidInt("Columns (4-20): ", 4, 20);
 
-        ds.getHalls().add(new Hall(ds.generateId(), location, hallName, rows, columns));
-        ds.saveHalls();
-        System.out.println("Hall added.");
+            ds.getHalls().add(new Hall(ds.generateId(), location, hallName, rows, columns));
+            ds.saveHalls();
+            System.out.println("Hall added.");
+        } catch (InvalidInputException e) {
+            System.out.println("Error: " + e.getMessage());
+        }
+    }
+
+    // returns true when any schedule in this hall has at least one confirmed
+    // booking in the seat ledger
+    private boolean hallHasBookings(int hallId) {
+        DataStore ds = DataStore.getInstance();
+        for (Schedule s : ds.getSchedules()) {
+            if (s.getHallId() == hallId) {
+                for (SeatLedgerEntry e : ds.getLedger()) {
+                    if (e.getScheduleId() == s.getId()) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     private void editHall() {
@@ -283,24 +349,42 @@ public class Admin extends User {
 
                 switch (option) {
                     case 1:
-                        h.setCinemaLocation(InputHelper.getValidName("New cinema location: ", 2, 30));
-                        ds.saveHalls();
-                        System.out.println("Cinema location updated.");
+                        String newLocation = InputHelper.getValidName("New cinema location: ", 2, 30);
+                        if (hallNameExists(newLocation, h.getHallName(), h.getId())) {
+                            System.out.println("Error: A hall named \"" + h.getHallName() + "\" already exists at that cinema location.");
+                        } else {
+                            h.setCinemaLocation(newLocation);
+                            ds.saveHalls();
+                            System.out.println("Cinema location updated.");
+                        }
                         break;
                     case 2:
-                        h.setHallName(InputHelper.getValidName("New hall name: ", 2, 30));
-                        ds.saveHalls();
-                        System.out.println("Hall name updated.");
+                        String newHallName = InputHelper.getValidName("New hall name: ", 2, 30);
+                        if (hallNameExists(h.getCinemaLocation(), newHallName, h.getId())) {
+                            System.out.println("Error: A hall named \"" + newHallName + "\" already exists at that cinema location.");
+                        } else {
+                            h.setHallName(newHallName);
+                            ds.saveHalls();
+                            System.out.println("Hall name updated.");
+                        }
                         break;
                     case 3:
-                        h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
-                        ds.saveHalls();
-                        System.out.println("Rows updated.");
+                        if (hallHasBookings(h.getId())) {
+                            System.out.println("Error: Cannot change rows — this hall has confirmed bookings.");
+                        } else {
+                            h.setRows(InputHelper.getValidInt("New rows (3-12): ", 3, 12));
+                            ds.saveHalls();
+                            System.out.println("Rows updated.");
+                        }
                         break;
                     case 4:
-                        h.setColumns(InputHelper.getValidInt("New columns (4-20): ", 4, 20));
-                        ds.saveHalls();
-                        System.out.println("Columns updated.");
+                        if (hallHasBookings(h.getId())) {
+                            System.out.println("Error: Cannot change columns — this hall has confirmed bookings.");
+                        } else {
+                            h.setColumns(InputHelper.getValidInt("New columns (4-20): ", 4, 20));
+                            ds.saveHalls();
+                            System.out.println("Columns updated.");
+                        }
                         break;
                     case 5:
                         done = true;
