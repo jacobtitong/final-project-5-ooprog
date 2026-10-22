@@ -1,3 +1,5 @@
+package titong_model_data;
+
 public class Discount {
     private String code;
     private String type;

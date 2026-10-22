@@ -1,3 +1,5 @@
+package titong_model_data;
+
 public class Hall {
     private int id;
     private String cinemaLocation;

@@ -1,3 +1,5 @@
+package titong_model_data;
+
 public class Schedule {
     private int id;
     private int movieId;

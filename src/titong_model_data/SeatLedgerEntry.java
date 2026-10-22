@@ -1,3 +1,5 @@
+package titong_model_data;
+
 public class SeatLedgerEntry {
     private int scheduleId;
     private String seatCode;

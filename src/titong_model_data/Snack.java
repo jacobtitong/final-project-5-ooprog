@@ -1,3 +1,5 @@
+package titong_model_data;
+
 public class Snack {
     private int id;
     private String name;
